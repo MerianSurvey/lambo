@@ -1,7 +1,9 @@
 # Don't upload figures, images, and catalogs
-*/*.fits
-*/*.png
-*/*.pkl
+*.fits
+*.fits.gz
+*.png
+*.pdf
+*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
