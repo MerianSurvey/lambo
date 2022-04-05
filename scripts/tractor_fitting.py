@@ -31,7 +31,7 @@ meas_cat = initialize_meas_cat(obj_cat)
 
 # Setup fitting
 channels = 'grizyN'
-ref_filt = 'i'
+ref_filt = 'r'
 forced_channels = [filt for filt in channels if filt != ref_filt]
 
 
@@ -79,7 +79,7 @@ def fitting_obj(index, obj_cat, meas_cat,):
             verbose=False)
 
         for filt in forced_channels:
-            pos = False if filt == 'N' else True
+            pos = True  # False if filt == 'N' else True
             model_dict[filt] = tractor_hsc_sep_blob_by_blob(
                 obj, filt, data.channels, data,
                 ref_source=model_dict[ref_filt].catalog[model_dict[ref_filt].target_ind],
