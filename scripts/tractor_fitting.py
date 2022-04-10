@@ -30,8 +30,8 @@ obj_cat['dir'] = [file.replace('/projects/MERIAN/poststamps/g09_broadcut',
 meas_cat = initialize_meas_cat(obj_cat)
 
 # Setup fitting
-channels = 'grizyN'
-ref_filt = 'r'
+channels = list('grizy') + ['N708', 'N540']
+ref_filt = 'i'
 forced_channels = [filt for filt in channels if filt != ref_filt]
 
 
@@ -44,16 +44,16 @@ def fitting_obj(index, obj_cat, meas_cat,):
     row['ID'] = obj['ID']
 
     print(f'### Tractor modeling for obj {index}, ID = {obj["ID"]}')
+
     try:
         cutout = [fits.open(os.path.join(
             obj['dir'], f's18a_wide_{obj["ID"]}_{filt}.fits')) for filt in 'grizy']
         cutout += [fits.open(os.path.join(obj['dir'],
-                                          f"{obj['PREFIX']}_N708_deepCoadd.fits"))]
-
+                             f"{obj['PREFIX']}_{filt}_deepCoadd.fits")) for filt in channels[-2:]]
         psf_list = [fits.open(os.path.join(
             obj['dir'], f's18a_wide_{obj["ID"]}_{filt}_psf.fits')) for filt in 'grizy']
         psf_list += [fits.open(os.path.join(obj['dir'],
-                                            f"{obj['PREFIX']}_N708_psf.fits"))]
+                               f"{obj['PREFIX']}_{filt}_psf.fits")) for filt in channels[-2:]]
         # Reconstruct data
         from kuaizi.detection import Data
         from kuaizi.utils import padding_PSF
@@ -74,16 +74,16 @@ def fitting_obj(index, obj_cat, meas_cat,):
         # fitting in the i-band first: then pass the i-band parameters of target galaxy to other bands
         model_dict[ref_filt] = tractor_hsc_sep_blob_by_blob(
             obj, ref_filt, data.channels, data,
-            freeze_dict={'pos': False, 'shape': False,
+            freeze_dict={'pos': False, 'shape.ab': False, 'shape.phi': False,
                          'sersicindex': False},  # don't fix shape/sersic
             verbose=False)
 
         for filt in forced_channels:
-            pos = True  # False if filt == 'N' else True
+            pos = False  # False if filt == 'N' else True
             model_dict[filt] = tractor_hsc_sep_blob_by_blob(
                 obj, filt, data.channels, data,
                 ref_source=model_dict[ref_filt].catalog[model_dict[ref_filt].target_ind],
-                freeze_dict={'pos': pos, 'shape': True,
+                freeze_dict={'pos': pos, 'shape.ab': True, 'shape.phi': True,
                              'sersicindex': True},  # don't fix shape/sersic
                 verbose=False,)
         with open(os.path.join(obj['dir'], f'cosmos_{obj["ID"]}_tractor.pkl'), 'wb') as f:
@@ -99,7 +99,7 @@ def fitting_obj(index, obj_cat, meas_cat,):
 
 
 # Main
-ncpu = 12
+ncpu = 16
 low = 0
 high = 200
 pwel = mp.Pool(ncpu)
