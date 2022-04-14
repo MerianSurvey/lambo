@@ -1,3 +1,7 @@
+"""
+This file runs tractor fitting for objects in a give catalog.
+"""
+import fire
 import os
 import numpy as np
 from astropy import wcs
@@ -12,30 +16,16 @@ from functools import partial
 import kuaizi
 from kuaizi.detection import Data
 from kuaizi.utils import padding_PSF
-from kuaizi.tractor.utils import tractor_hsc_sep_blob_by_blob, initialize_meas_cat, _write_to_row
-kuaizi.set_env(project='Merian', name='',
-               data_dir='/scratch/gpfs/jiaxuanl/Data')
-
+from kuaizi.tractor.utils import initialize_meas_cat, _write_to_row
+from kuaizi.tractor.fit import tractor_hsc_sep_blob_by_blob
 
 import sys
 sys.path.append('/home/jiaxuanl/software/astrometry.net-0.89')
 sys.path.append('/home/jiaxuanl/Research/Packages/tractor/')
 
-# Load catalog
-obj_cat = Table.read('./Catalogs/COSMOS_cutouts_tractor_gaap_test.fits')
-obj_cat['dir'] = [file.replace('/projects/MERIAN/poststamps/g09_broadcut',
-                               '/scratch/gpfs/jiaxuanl/Data/Merian/Cutout'
-                               ) for file in obj_cat['dir']]
-# Initialize output catalog
-meas_cat = initialize_meas_cat(obj_cat)
 
-# Setup fitting
-channels = list('grizy') + ['N708', 'N540']
-ref_filt = 'i'
-forced_channels = [filt for filt in channels if filt != ref_filt]
-
-
-def fitting_obj(index, obj_cat, meas_cat,):
+def fitting_obj(index, obj_cat, meas_cat,
+                channels=['g', 'r', 'i', 'z', 'N708', 'N540'], ref_filt='i'):
     """
     Wrapper for fitting one object.
     """
@@ -43,21 +33,21 @@ def fitting_obj(index, obj_cat, meas_cat,):
     obj = obj_cat[index]
     row['ID'] = obj['ID']
 
+    forced_channels = [filt for filt in channels if filt != ref_filt]
+
     print(f'### Tractor modeling for obj {index}, ID = {obj["ID"]}')
 
     try:
+        # Load data
         cutout = [fits.open(os.path.join(
             obj['dir'], f's18a_wide_{obj["ID"]}_{filt}.fits')) for filt in 'grizy']
         cutout += [fits.open(os.path.join(obj['dir'],
-                             f"{obj['PREFIX']}_{filt}_deepCoadd.fits")) for filt in channels[-2:]]
+                                          f"{obj['PREFIX']}_{filt}_deepCoadd.fits")) for filt in channels[-2:]]
         psf_list = [fits.open(os.path.join(
             obj['dir'], f's18a_wide_{obj["ID"]}_{filt}_psf.fits')) for filt in 'grizy']
         psf_list += [fits.open(os.path.join(obj['dir'],
-                               f"{obj['PREFIX']}_{filt}_psf.fits")) for filt in channels[-2:]]
+                                            f"{obj['PREFIX']}_{filt}_psf.fits")) for filt in channels[-2:]]
         # Reconstruct data
-        from kuaizi.detection import Data
-        from kuaizi.utils import padding_PSF
-
         images = np.array([hdu[1].data for hdu in cutout if len(hdu) > 1])
         # note: all bands share the same WCS here
         w = wcs.WCS(cutout[0][1].header)
@@ -72,40 +62,86 @@ def fitting_obj(index, obj_cat, meas_cat,):
     try:
         model_dict = {}
         # fitting in the i-band first: then pass the i-band parameters of target galaxy to other bands
-        model_dict[ref_filt] = tractor_hsc_sep_blob_by_blob(
+        model_dict[ref_filt], _obj_cat_i = tractor_hsc_sep_blob_by_blob(
             obj, ref_filt, data.channels, data,
-            freeze_dict={'pos': False, 'shape.ab': False, 'shape.phi': False,
+            freeze_dict={'pos': False, 'shape': False, 'shape.re': False, 'shape.ab': False, 'shape.phi': False,
                          'sersicindex': False},  # don't fix shape/sersic
             verbose=False)
 
         for filt in forced_channels:
-            pos = False  # False if filt == 'N' else True
-            model_dict[filt] = tractor_hsc_sep_blob_by_blob(
+            pos = True
+            fix_all = True
+            ref_catalog = model_dict[ref_filt].catalog.copy()
+            model_dict[filt], _ = tractor_hsc_sep_blob_by_blob(
                 obj, filt, data.channels, data,
-                ref_source=model_dict[ref_filt].catalog[model_dict[ref_filt].target_ind],
-                freeze_dict={'pos': pos, 'shape.ab': True, 'shape.phi': True,
+                fix_all=fix_all, tractor_cat=ref_catalog,
+                obj_cat=_obj_cat_i,
+                freeze_dict={'pos': pos, 'shape': True, 'shape.re': True, 'shape.ab': True, 'shape.phi': True,
                              'sersicindex': True},  # don't fix shape/sersic
-                verbose=False,)
-        with open(os.path.join(obj['dir'], f'cosmos_{obj["ID"]}_tractor.pkl'), 'wb') as f:
-            pickle.dump(model_dict, f)
-
-        # Write to catalog
-        row = _write_to_row(row, model_dict)
-        return row
-
+                verbose=False)
+        # with open(os.path.join(obj['dir'], f'cosmos_{obj["ID"]}_tractor.pkl'), 'wb') as f:
+        #     pickle.dump(model_dict, f)
     except Exception as e:
         print(f'FITTING ERROR FOR {index} = obj {obj["ID"]}', e)
-        return
+    try:
+        row = _write_to_row(row, model_dict, channels=channels)
+    except Exception as e:
+        print(f'MEAUREMENT ERROR FOR {index} = obj {obj["ID"]}', e)
+    return row
 
 
-# Main
-ncpu = 16
-low = 0
-high = 200
-pwel = mp.Pool(ncpu)
-meas_cat_tractor = pwel.map(
-    partial(fitting_obj, obj_cat=obj_cat, meas_cat=meas_cat), range(low, high))
-meas_cat_tractor = vstack(meas_cat_tractor)
+# cat_dir = f'./Catalogs/COSMOS_cutouts_tractor_gaap_{cat_prefix}.fits'
+def multiprocess_fitting(cat_dir, suffix='midz', njobs=16, low=0, high=250, ind_list=None,
+                         DATADIR='/scratch/gpfs/jiaxuanl/Data/Merian',
+                         CUTOUT_SUBDIR='./Cutout/',
+                         CATALOG_SUBDIR='./Catalogs/'):
+    print('SET ENVIRONMENT')
+    os.chdir(DATADIR)
+    print("CURRENT WORKING DIRECTORY:", os.getcwd())
+    print('Number of processor to use:', njobs)
 
-meas_cat_tractor.write(
-    f'./Catalogs/tractor_test_output_{low}_{high}.fits', overwrite=True)
+    # Load catalog
+    print('Load catalog')
+
+    obj_cat = Table.read(cat_dir)
+    obj_cat['dir'] = [file.replace('/projects/MERIAN/poststamps/g09_broadcut',
+                                   os.path.join(DATADIR, CUTOUT_SUBDIR),
+                                   ) for file in obj_cat['dir']]
+
+    if low is None:
+        low = 0
+    if high is None:
+        high = len(obj_cat)
+
+    # Setup fitting
+    channels = list('grizy') + ['N708', 'N540']
+    ref_filt = 'i'
+
+    # Initialize output catalog
+    meas_cat = initialize_meas_cat(obj_cat, channels=channels)
+
+    # Multiprocessing
+    pwel = mp.Pool(njobs)
+    iterable = range(low, high) if ind_list is None else ind_list
+    meas_cat_tractor = pwel.map(
+        partial(fitting_obj, obj_cat=obj_cat, meas_cat=meas_cat,
+                channels=channels, ref_filt=ref_filt), iterable)
+
+    if ind_list is not None:
+        output_filename = f'{DATADIR}/{CATALOG_SUBDIR}/tractor_{suffix}_output_ind_list.pkl'
+    else:
+        output_filename = f'{DATADIR}/{CATALOG_SUBDIR}/tractor_{suffix}_output_{low}_{high}.pkl'
+
+    with open(output_filename, 'wb') as f:
+        pickle.dump(meas_cat_tractor, f)
+
+    meas_cat_tractor = vstack(meas_cat_tractor)
+    output_filename = output_filename.replace('.pkl', '.fits')
+    print('#############')
+    print('Writing to file:', output_filename)
+    meas_cat_tractor.write(output_filename, overwrite=True)
+    print('#############')
+
+
+if __name__ == '__main__':
+    fire.Fire(multiprocess_fitting)
