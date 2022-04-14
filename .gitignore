@@ -1,3 +1,5 @@
+*.o
+
 # Don't upload figures, images, and catalogs
 *.fits
 *.fits.gz

@@ -25,7 +25,7 @@ def batch_cutout(data_dir, obj_cat_dir, low=0, high=None,
                  size=1.0, unit='arcmin', bands='grizy',
                  ra_name='ra', dec_name='dec',
                  name='Seq', prefix='s18a_wide', output='./Cutout',
-                 catalog_dir='./Catalog', catalog_suffix='',
+                 catalog_dir='./Catalogs', catalog_suffix='',
                  label='deepCoadd_calexp', root=DATA_ROOT, overwrite=False,
                  njobs=1, psf=True):
     '''
