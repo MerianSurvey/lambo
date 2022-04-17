@@ -1,2 +1,3 @@
-# merian_tractor
-Model dwarf galaxies with `the Tractor` in forced photometry mode. 
+# Lambo
+
+Model dwarf galaxies in HSC and Merian data with `lambo`: a special-designed `Tractor`. 
