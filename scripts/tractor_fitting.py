@@ -42,7 +42,7 @@ def fitting_obj(index, obj_cat, meas_cat,
         cutout = [fits.open(os.path.join(
             obj['dir'], f's18a_wide_{obj["ID"]}_{filt}.fits')) for filt in 'grizy']
         cutout += [fits.open(os.path.join(obj['dir'],
-                                          f"{obj['PREFIX']}_{filt}_deepCoadd.fits")) for filt in channels[-2:]]
+                                          f"{obj['PREFIX']}_{filt}_deepCoadd_calexp.fits")) for filt in channels[-2:]]
         psf_list = [fits.open(os.path.join(
             obj['dir'], f's18a_wide_{obj["ID"]}_{filt}_psf.fits')) for filt in 'grizy']
         psf_list += [fits.open(os.path.join(obj['dir'],
@@ -104,7 +104,7 @@ def multiprocess_fitting(cat_dir, suffix='midz', njobs=16, low=0, high=250, ind_
     print('Load catalog')
 
     obj_cat = Table.read(cat_dir)
-    obj_cat['dir'] = [file.replace('/projects/MERIAN/poststamps/g09_broadcut',
+    obj_cat['dir'] = [file.replace('/projects/MERIAN/poststamps/g09_broadcut_new',
                                    os.path.join(DATADIR, CUTOUT_SUBDIR),
                                    ) for file in obj_cat['dir']]
 

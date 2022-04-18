@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH -J trctr_job_0_500
+#SBATCH -J trctr_job_0_10
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=10
+#SBATCH --ntasks-per-node=1
 #SBATCH --mem-per-cpu=2G
 #SBATCH --time=11:59:00
 #SBATCH --export=ALL
-#SBATCH -o trctr_job_0_500.o
+#SBATCH -o trctr_job_0_10.o
 #SBATCH --mail-type=all
 #SBATCH --mail-user=jiaxuanl@princeton.edu
 
@@ -16,8 +16,8 @@ module purge
 . /home/jiaxuanl/Research/Merian/setup_env.sh
 export OMP_NUM_THREADS=1
 
-python tractor_fitting.py /scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/COSMOS_cutouts_tractor_gaap_lowz_calexp.fits --suffix lowz_calexp --njobs 36 \
---low 0 --high 500 --ind_list None --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
+python tractor_fitting.py /scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/COSMOS_cutouts_tractor_gaap_lowz_calexp.fits --suffix lowz_calexp --njobs 3 \
+--low 0 --high 10 --ind_list None --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
 --CUTOUT_SUBDIR ./Cutout/ --CATALOG_SUBDIR ./Catalogs/ \
 
 

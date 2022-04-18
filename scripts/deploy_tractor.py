@@ -2,7 +2,7 @@ import os
 import sys
 import fire
 
-SUFFIX = 'lowz'
+SUFFIX = 'lowz_calexp'
 CAT_DIR = f'/scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/COSMOS_cutouts_tractor_gaap_{SUFFIX}.fits'
 
 
@@ -64,4 +64,6 @@ if __name__ == '__main__':
 
 
 ############ EXAMPLE #############
-# python deploy_tractor.py --low 0 --high 500 --ncpu 12 --njobs 44 --name trctr_job
+# python deploy_tractor.py --low 0 --high 500 --ncpu 13 --njobs 46 --name trctr_job
+
+# python deploy_tractor.py --low 0 --high 10 --ncpu 1 --njobs 3 --name trctr_job
