@@ -8,7 +8,7 @@ CAT_DIR = f'/scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/COSMOS_cutouts_tractor_g
 
 def deploy_modeling_job(low=0, high=100, ind_list=None, name='trctr_job', ncpu=12, njobs=44,
                         DATADIR='/scratch/gpfs/jiaxuanl/Data/Merian',
-                        CUTOUT_SUBDIR='./Cutout/',
+                        CUTOUT_SUBDIR='./Cutout/_new/',
                         CATALOG_SUBDIR='./Catalogs/'):
     ''' 
     create slurm script and then submit 
@@ -64,6 +64,9 @@ if __name__ == '__main__':
 
 
 ############ EXAMPLE #############
-# python deploy_tractor.py --low 0 --high 500 --ncpu 13 --njobs 46 --name trctr_job
+# python deploy_tractor.py --low 0 --high 500 --ncpu 15 --njobs 54 --name trctr_job1
+# python deploy_tractor.py --low 500 --high 1000 --ncpu 15 --njobs 54 --name trctr_job2
+# python deploy_tractor.py --low 1000 --high 1500 --ncpu 15 --njobs 54 --name trctr_job3
+# python deploy_tractor.py --low 1500 --high None --ncpu 15 --njobs 54 --name trctr_job4
 
-# python deploy_tractor.py --low 0 --high 10 --ncpu 1 --njobs 3 --name trctr_job
+# python deploy_tractor.py --low 500 --high 510 --ncpu 1 --njobs 3 --name trctr_job

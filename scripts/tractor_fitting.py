@@ -93,7 +93,7 @@ def fitting_obj(index, obj_cat, meas_cat,
 # cat_dir = f'./Catalogs/COSMOS_cutouts_tractor_gaap_{cat_prefix}.fits'
 def multiprocess_fitting(cat_dir, suffix='midz', njobs=16, low=0, high=250, ind_list=None,
                          DATADIR='/scratch/gpfs/jiaxuanl/Data/Merian',
-                         CUTOUT_SUBDIR='./Cutout/',
+                         CUTOUT_SUBDIR='./Cutout/_new/',
                          CATALOG_SUBDIR='./Catalogs/'):
     print('SET ENVIRONMENT')
     os.chdir(DATADIR)
