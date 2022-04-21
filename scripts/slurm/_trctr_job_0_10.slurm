@@ -16,9 +16,9 @@ module purge
 . /home/jiaxuanl/Research/Merian/setup_env.sh
 export OMP_NUM_THREADS=1
 
-python tractor_fitting.py /scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/COSMOS_cutouts_tractor_gaap_lowz_calexp.fits --suffix lowz_calexp --njobs 3 \
+python tractor_fitting.py /scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/magellan/magellan_spec_obj_cat.fits --suffix magellan --njobs 3 \
 --low 0 --high 10 --ind_list None --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
---CUTOUT_SUBDIR ./Cutout/ --CATALOG_SUBDIR ./Catalogs/ \
+--CUTOUT_SUBDIR ./Cutout/magellan_spec/ --CATALOG_SUBDIR ./Catalogs/magellan/ \
 
 
 

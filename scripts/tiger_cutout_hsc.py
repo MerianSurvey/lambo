@@ -378,9 +378,13 @@ def cutout_one(butler, skymap, obj, band, label, psf, overwrite=False):
     prefix, ra, dec, radius = obj['prefix'], obj['ra'], obj['dec'], obj['radius']
     prefix = '_'.join([prefix, band.lower().strip()])
 
+    # prefix = prefix.replace('./Cutout/', './Cutout/' +
+    #                         obj['dir'].replace(
+    #                             '/projects/MERIAN/poststamps/g09_broadcut', '') + '/')
+
     prefix = prefix.replace('./Cutout/', './Cutout/' +
                             obj['dir'].replace(
-                                '/projects/MERIAN/poststamps/g09_broadcut', '') + '/')
+                                '/scratch/gpfs/jiaxuanl/Data/Merian/Cutout/', '') + '/')
 
     # Make a new folder if necessary
     if not os.path.isdir(os.path.split(prefix)[0]):

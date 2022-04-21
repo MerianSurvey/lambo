@@ -2,8 +2,9 @@ import os
 import sys
 import fire
 
-SUFFIX = 'lowz_calexp'
-CAT_DIR = f'/scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/COSMOS_cutouts_tractor_gaap_{SUFFIX}.fits'
+SUFFIX = 'magellan'  # 'lowz_calexp'
+CAT_DIR = "/scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/magellan/magellan_spec_obj_cat.fits"
+# CAT_DIR = f'/scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/COSMOS_cutouts_tractor_gaap_{SUFFIX}.fits'
 
 
 def deploy_modeling_job(low=0, high=100, ind_list=None, name='trctr_job', ncpu=12, njobs=44,
@@ -70,3 +71,10 @@ if __name__ == '__main__':
 # python deploy_tractor.py --low 1500 --high None --ncpu 15 --njobs 54 --name trctr_job4
 
 # python deploy_tractor.py --low 500 --high 510 --ncpu 1 --njobs 3 --name trctr_job
+
+
+# python deploy_tractor.py --low 0 --high 400 --ncpu 15 --njobs 54 --name trctr_job --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
+# --CUTOUT_SUBDIR './Cutout/magellan_spec/' --CATALOG_SUBDIR './Catalogs/magellan/'
+
+# python deploy_tractor.py --low 600 --high None --ncpu 15 --njobs 54 --name trctr_job --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
+# --CUTOUT_SUBDIR './Cutout/magellan_spec/' --CATALOG_SUBDIR './Catalogs/magellan/'
