@@ -579,34 +579,36 @@ def test_cutout():
     Test the cutout function.
     """
     root = '/projects/MERIAN/repo'
-    output = '/scratch/gpfs/jiaxuanl/Data/Merian/Cutout/magellan_spec/'
+    output = '/scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/'
 
     n708 = 'DECam/runs/merian/w_2022_02/t9813_deep_N708'
     n540 = 'DECam/runs/merian/w_2022_02/t9813_deep_N540'
 
-    input_cat = os.path.join(output, 'magellan_spec_obj_cat.fits')
+    input_cat = os.path.join(output, 'stars_obj_cat.fits')
 
     data_type = 'deepCoadd_calexp'
 
+    today = date.today()
+
     # sample_n708 = cutout_batch(
     #     input_cat, root, n708, 'N708', njobs=2, psf=True, ready=False, save=True, half_size='half_size',
-    #     unit='arcsec', data_type=data_type, output_dir=output, prefix='magellan_spec', chunk=90, verbose=True)
+    #     unit='arcsec', data_type=data_type, output_dir=output, prefix='stars', chunk=90, verbose=True)
 
     # sample_n708.write(os.path.join(
-    #     output, 'magellan_spec-2022-04-20_n708_done.fits'))
+    #     output, f'stars-{today.year:4d}-{today.month:02d}-{today.day:02d}_n708_done.fits'), overwrite=True)
 
-    #today = date.today()
+    # today = date.today()
     # input_cat = os.path.join(
     #    output, 'g09_broadcut_cosmos-{:4d}-{:02d}-{:02d}.fits'.format(today.year, today.month, today.day))
 
     sample_n540 = cutout_batch(
         input_cat, root, n540, 'N540', njobs=2, psf=True, ready=False, save=True, half_size='half_size',
-        unit='arcsec', data_type=data_type, output_dir=output, prefix='magellan_spec', chunk=90, verbose=True)
+        unit='arcsec', data_type=data_type, output_dir=output, prefix='stars', chunk=90, verbose=True)
 
     sample_n540.write(os.path.join(
-        output, 'magellan_spec-2022-04-20_n540_done.fits'))
+        output, f'stars-{today.year:4d}-{today.month:02d}-{today.day:02d}_n540_done.fits'), overwrite=True)
 
-    return sample_n540  # sample_n708, sample_n540
+    return sample_n540  # sample_n540  #sample_n708,
 
     # Prepare the input catalog
     # sample = _prepare_input_cat(

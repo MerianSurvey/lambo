@@ -2,12 +2,12 @@ import os
 import sys
 import fire
 
-SUFFIX = 'magellan'  # 'lowz_calexp'
-CAT_DIR = "/scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/magellan/magellan_spec_obj_cat.fits"
-# CAT_DIR = f'/scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/COSMOS_cutouts_tractor_gaap_{SUFFIX}.fits'
+SUFFIX = 'stars'  # 'lowz_calexp'
+CAT_DIR = "/scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/stars-2022-04-25.fits"
 
 
 def deploy_modeling_job(low=0, high=100, ind_list=None, name='trctr_job', ncpu=12, njobs=44,
+                        point_source=False,
                         DATADIR='/scratch/gpfs/jiaxuanl/Data/Merian',
                         CUTOUT_SUBDIR='./Cutout/_new/',
                         CATALOG_SUBDIR='./Catalogs/'):
@@ -16,7 +16,7 @@ def deploy_modeling_job(low=0, high=100, ind_list=None, name='trctr_job', ncpu=1
     '''
     time = "11:59:00"
     run_tractor_content = '\n'.join([
-        f"python tractor_fitting.py {CAT_DIR} --suffix {SUFFIX} --njobs {njobs} \\",
+        f"python tractor_fitting.py {CAT_DIR} --suffix {SUFFIX} --njobs {njobs} --point_source {point_source} \\",
         f"--low {low} --high {high} --ind_list {ind_list} --DATADIR {DATADIR} \\",
         f"--CUTOUT_SUBDIR {CUTOUT_SUBDIR} --CATALOG_SUBDIR {CATALOG_SUBDIR} \\"
     ])
@@ -76,5 +76,8 @@ if __name__ == '__main__':
 # python deploy_tractor.py --low 0 --high 400 --ncpu 15 --njobs 54 --name trctr_job --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
 # --CUTOUT_SUBDIR './Cutout/magellan_spec/' --CATALOG_SUBDIR './Catalogs/magellan/'
 
-# python deploy_tractor.py --low 600 --high None --ncpu 15 --njobs 54 --name trctr_job --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
+# python deploy_tractor.py --low 400 --high None --ncpu 15 --njobs 54 --name trctr_job --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
 # --CUTOUT_SUBDIR './Cutout/magellan_spec/' --CATALOG_SUBDIR './Catalogs/magellan/'
+
+# python deploy_tractor.py --low 0 --high None --ncpu 15 --njobs 54 --name trctr_job --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
+# --CUTOUT_SUBDIR './Cutout/stars/' --CATALOG_SUBDIR './Catalogs/stars/' --point_source "True"

@@ -13,7 +13,6 @@ import multiprocess as mp
 mp.freeze_support()
 from functools import partial
 
-import kuaizi
 from kuaizi.detection import Data
 from kuaizi.utils import padding_PSF
 from kuaizi.tractor.utils import initialize_meas_cat, _write_to_row
@@ -24,7 +23,7 @@ sys.path.append('/home/jiaxuanl/software/astrometry.net-0.89')
 sys.path.append('/home/jiaxuanl/Research/Packages/tractor/')
 
 
-def fitting_obj(index, obj_cat, meas_cat,
+def fitting_obj(index, obj_cat, meas_cat, point_source=False,
                 channels=['g', 'r', 'i', 'z', 'N708', 'N540'], ref_filt='i'):
     """
     Wrapper for fitting one object.
@@ -39,7 +38,12 @@ def fitting_obj(index, obj_cat, meas_cat,
 
     forced_channels = [filt for filt in channels if filt != ref_filt]
 
+    if isinstance(point_source, str):
+        point_source = (point_source.lower() == 'true')
+
     print(f'### Tractor modeling for obj {index}, ID = {obj[ID_name]}')
+    if point_source:
+        print('    Point source mode')
 
     try:
         # Load data
@@ -77,7 +81,7 @@ def fitting_obj(index, obj_cat, meas_cat,
         model_dict = {}
         # fitting in the i-band first: then pass the i-band parameters of target galaxy to other bands
         model_dict[ref_filt], _obj_cat_i = tractor_hsc_sep_blob_by_blob(
-            obj, ref_filt, data.channels, data,
+            obj, ref_filt, data.channels, data, point_source=point_source,
             freeze_dict={'pos': False, 'shape': False, 'shape.re': False, 'shape.ab': False, 'shape.phi': False,
                          'sersicindex': False},  # don't fix shape/sersic
             verbose=False)
@@ -158,7 +162,7 @@ def multiprocess_fitting(cat_dir, suffix='midz', njobs=16, low=0, high=250, ind_
 
 
 # cat_dir = './Catalogs/magellan/magellan_spec_obj_cat.fits'
-def multiprocess_fitting_magellan(cat_dir, suffix='', njobs=16, low=0, high=250, ind_list=None,
+def multiprocess_fitting_magellan(cat_dir, suffix='', point_source=True, njobs=16, low=0, high=250, ind_list=None,
                                   DATADIR='/scratch/gpfs/jiaxuanl/Data/Merian',
                                   CUTOUT_SUBDIR='./Cutout/magellan_spec/',
                                   CATALOG_SUBDIR='./Catalogs/magellan/'):
@@ -171,6 +175,7 @@ def multiprocess_fitting_magellan(cat_dir, suffix='', njobs=16, low=0, high=250,
     print('Load catalog')
 
     obj_cat = Table.read(cat_dir)
+    obj_cat['id'] = obj_cat['name']
     # obj_cat['dir'] = [file.replace('/projects/MERIAN/poststamps/g09_broadcut_new',
     #                                os.path.join(DATADIR, CUTOUT_SUBDIR),
     #                                ) for file in obj_cat['dir']]
@@ -192,7 +197,7 @@ def multiprocess_fitting_magellan(cat_dir, suffix='', njobs=16, low=0, high=250,
     iterable = range(low, high) if ind_list is None else ind_list
     meas_cat_tractor = pwel.map(
         partial(fitting_obj, obj_cat=obj_cat, meas_cat=meas_cat,
-                channels=channels, ref_filt=ref_filt), iterable)
+                channels=channels, ref_filt=ref_filt, point_source=point_source), iterable)
 
     if ind_list is not None:
         output_filename = f'{DATADIR}/{CATALOG_SUBDIR}/tractor_{suffix}_output_ind_list.pkl'
@@ -213,6 +218,7 @@ def multiprocess_fitting_magellan(cat_dir, suffix='', njobs=16, low=0, high=250,
 if __name__ == '__main__':
     fire.Fire(multiprocess_fitting_magellan)
 
-# python tractor_fitting.py /scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/magellan/magellan_spec_obj_cat.fits --suffix "magellan" --njobs 3 \
-# --low 0 --high 10 --ind_list None --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
-# --CUTOUT_SUBDIR './Cutout/magellan_spec/' --CATALOG_SUBDIR './Catalogs/magellan/' \
+# python tractor_fitting.py /scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/stars-2022-04-25.fits \
+# --point_source "True" --suffix "stars" --njobs 3 \
+# --low 0 --high 3 --ind_list None --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
+# --CUTOUT_SUBDIR './Cutout/stars/' --CATALOG_SUBDIR './Catalogs/stars/' \
