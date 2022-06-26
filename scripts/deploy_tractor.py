@@ -3,7 +3,7 @@ import sys
 import fire
 
 SUFFIX = 'stars'  # 'lowz_calexp'
-CAT_DIR = "/scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/stars-2022-05-29.fits"
+CAT_DIR = "/scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/stars-2022-06-26.fits"
 
 
 def deploy_modeling_job(low=0, high=100, ind_list=None, name='trctr_job', ncpu=12, njobs=44,
@@ -55,8 +55,8 @@ def deploy_modeling_job(low=0, high=100, ind_list=None, name='trctr_job', ncpu=1
         f'./slurm/_{name}_ind_list.slurm', 'w')
     f.write(cntnt)
     f.close()
-    os.system(f'sbatch ./slurm/_{name}_{low}_{high}.slurm') if ind_list is None else os.system(
-        f'sbatch ./slurm/_{name}_ind_list.slurm')
+    # os.system(f'sbatch ./slurm/_{name}_{low}_{high}.slurm') if ind_list is None else os.system(
+    #     f'sbatch ./slurm/_{name}_ind_list.slurm')
     return None
 
 

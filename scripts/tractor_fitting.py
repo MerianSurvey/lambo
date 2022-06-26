@@ -35,6 +35,9 @@ def padding_PSF(psf_hdu):
     '''
     If the sizes of HSC PSF in all bands are not the same, this function pads the smaller PSFs.
 
+    The output size must be odd.
+
+
     Parameters:
         psf_list: a list returned by `unagi.task.hsc_psf` function
 
@@ -43,6 +46,8 @@ def padding_PSF(psf_hdu):
     '''
     # Padding PSF cutouts from HSC
     max_len = max(psf_hdu[0].data.shape)
+    if max_len % 2 == 0:
+        max_len += 1
 
     y_len, x_len = psf_hdu[0].data.shape
     dy = ((max_len - y_len) // 2, (max_len - y_len) // 2)
