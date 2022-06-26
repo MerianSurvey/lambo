@@ -13,12 +13,12 @@ now=$(date +"%T")
 echo "start time ... $now"
 
 module purge
-. /home/jiaxuanl/Research/Merian/setup_env.sh
+source /home/jiaxuanl/Research/Merian/merian_tractor/scripts/setup_env.sh
 export OMP_NUM_THREADS=1
 
-python tractor_fitting.py /scratch/gpfs/jiaxuanl/Data/Merian/Catalogs/magellan/magellan_spec_obj_cat.fits --suffix magellan --njobs 3 \
+python tractor_fitting.py /scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/stars-2022-05-29.fits --suffix stars --njobs 5 --point_source True \
 --low 0 --high 10 --ind_list None --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
---CUTOUT_SUBDIR ./Cutout/magellan_spec/ --CATALOG_SUBDIR ./Catalogs/magellan/ \
+--CUTOUT_SUBDIR ./Cutout/stars/ --CATALOG_SUBDIR ./Catalogs/stars/ \
 
 
 

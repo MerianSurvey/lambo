@@ -27,7 +27,9 @@ Log = lsst.log.Log()
 Log.setLevel(lsst.log.ERROR)
 
 
-DATA_ROOT = '/tigress/HSC/DR/s18a_wide'
+# DATA_ROOT = '/tigress/HSC/DR/s18a_wide'
+DATA_ROOT = '/projects/MERIAN/repo'
+rc2 = 'HSC/runs/RC2/w_2022_04/DM-33402/'
 PIXEL_SCALE = 0.168  # arcsec / pixel
 
 
@@ -145,7 +147,7 @@ def tracts_n_patches(coord_list, skymap=None, data_dir=DATA_ROOT):
         coord_list = make_afw_coords(coord_list)
 
     if skymap is None:
-        butler = lsst.daf.persistence.Butler(data_dir)
+        butler = lsst.daf.persistence.Butler(data_dir, collections=rc2)
         skymap = butler.get('deepCoadd_skyMap', immediate=True)
 
     tract_patch_list = skymap.findTractPatchList(coord_list)

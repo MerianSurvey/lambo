@@ -16,7 +16,11 @@ import lsst.log
 Log = lsst.log.Log()
 Log.setLevel(lsst.log.ERROR)
 
-DATA_ROOT = '/tigress/HSC/DR/s18a_wide'
+# DATA_ROOT = '/tigress/HSC/DR/s18a_wide'
+DATA_ROOT = '/projects/MERIAN/repo'
+rc2 = 'HSC/runs/RC2/w_2022_04/DM-33402/'
+
+# DATA_ROOT = '/projects/MERIAN/repo/HSC/runs/RC2/w_2022_04/DM-33402/20220128T212035Z'
 PIXEL_SCALE = 0.168  # arcsec / pixel
 
 
@@ -68,7 +72,7 @@ def batch_cutout(data_dir, obj_cat_dir, low=0, high=None,
 
     t0 = perf_counter()
 
-    butler = dafPersist.Butler(root)
+    butler = dafPersist.Butler(root, collections=rc2)
     skymap = butler.get('deepCoadd_skyMap', immediate=True)
     print('\n Number of jobs:', njobs)
 
@@ -153,3 +157,12 @@ def batch_cutout(data_dir, obj_cat_dir, low=0, high=None,
 
 if __name__ == '__main__':
     fire.Fire(batch_cutout)
+
+
+# python3 ./s18a_batch_cutout.py \
+#     "/scratch/gpfs/jiaxuanl/Data/"\
+#     "/scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/stars-2022-05-28_test.fits" \
+#     --ra_name ra --dec_name dec \
+#     --low 0 --high 10 --size half_size --unit arcsec \
+#     --bands grizy --name name --prefix RC2 \
+#     --njobs 2 --overwrite True

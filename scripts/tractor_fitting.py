@@ -4,6 +4,7 @@ This file runs tractor fitting for objects in a give catalog.
 import fire
 import os
 import numpy as np
+import copy
 from astropy import wcs
 from astropy.io import fits
 from astropy.table import Table, vstack
@@ -14,17 +15,55 @@ mp.freeze_support()
 from functools import partial
 
 from kuaizi.detection import Data
-from kuaizi.utils import padding_PSF
+# from kuaizi.utils import padding_PSF
 from kuaizi.tractor.utils import initialize_meas_cat, _write_to_row
 from kuaizi.tractor.fit import tractor_hsc_sep_blob_by_blob
 
 import sys
 sys.path.append('/home/jiaxuanl/software/astrometry.net-0.89')
 sys.path.append('/home/jiaxuanl/Research/Packages/tractor/')
+sys.path.append('/home/jiaxuanl/Research/Packages/carpenter/src/')
+
+import matplotlib.pyplot as plt
+
+import kuaizi
+kuaizi.set_matplotlib(style='JL', usetex=True, dpi=70)
+from carpenter.display import display_merian_cutout_rgb
+
+
+def padding_PSF(psf_hdu):
+    '''
+    If the sizes of HSC PSF in all bands are not the same, this function pads the smaller PSFs.
+
+    Parameters:
+        psf_list: a list returned by `unagi.task.hsc_psf` function
+
+    Returns:
+        psf_pad: a list including padded PSFs. They now share the same size.
+    '''
+    # Padding PSF cutouts from HSC
+    max_len = max(psf_hdu[0].data.shape)
+
+    y_len, x_len = psf_hdu[0].data.shape
+    dy = ((max_len - y_len) // 2, (max_len - y_len) // 2)
+    dx = ((max_len - x_len) // 2, (max_len - x_len) // 2)
+
+    if (max_len - y_len) == 1:
+        dy = (1, 0)
+    if (max_len - x_len) == 1:
+        dx = (1, 0)
+
+    temp = np.pad(psf_hdu[0].data.astype('float'),
+                  (dy, dx), 'constant', constant_values=0)
+
+    if temp.shape == (max_len, max_len):
+        return temp
+    else:
+        raise ValueError('Wrong size!')
 
 
 def fitting_obj(index, obj_cat, meas_cat, point_source=False,
-                channels=['g', 'r', 'i', 'z', 'N708', 'N540'], ref_filt='i'):
+                channels=['g', 'r', 'i', 'z', 'N708', 'N540'], ref_filt='r'):
     """
     Wrapper for fitting one object.
     """
@@ -36,7 +75,8 @@ def fitting_obj(index, obj_cat, meas_cat, point_source=False,
 
     row['ID'] = obj[ID_name]
 
-    forced_channels = [filt for filt in channels if filt != ref_filt]
+    # [filt for filt in channels if filt != ref_filt]
+    forced_channels = channels
 
     if isinstance(point_source, str):
         point_source = (point_source.lower() == 'true')
@@ -49,28 +89,33 @@ def fitting_obj(index, obj_cat, meas_cat, point_source=False,
         # Load data
         cutout = []
         for filt in channels:
-            if 'N' in filt:
-                cutout.append(fits.open(os.path.join(
-                    obj['dir'], f"{obj[PREFIX_name]}_{filt}_deepCoadd_calexp.fits")))
-            else:
-                cutout.append(fits.open(os.path.join(
-                    obj['dir'], f's18a_wide_{obj[ID_name]}_{filt}.fits')))
+            # if 'N' in filt:
+            #     cutout.append(fits.open(os.path.join(
+            #         obj['dir'], f"{obj[PREFIX_name]}_{filt}_deepCoadd_calexp.fits")))
+            # else:
+            #     cutout.append(fits.open(os.path.join(
+            #         obj['dir'], f's18a_wide_{obj[ID_name]}_{filt}.fits')))
+            cutout.append(fits.open(os.path.join(
+                obj['dir'], f"{obj['prefix']}_{filt}_deepCoadd_calexp.fits")))
 
         psf_list = []
         for filt in channels:
-            if 'N' in filt:
-                psf_list.append(fits.open(os.path.join(
-                    obj['dir'], f"{obj[PREFIX_name]}_{filt}_psf.fits")))
-            else:
-                psf_list.append(fits.open(os.path.join(
-                    obj['dir'], f's18a_wide_{obj[ID_name]}_{filt}_psf.fits')))
+            # if 'N' in filt:
+            #     psf_list.append(fits.open(os.path.join(
+            #         obj['dir'], f"{obj[PREFIX_name]}_{filt}_psf.fits")))
+            # else:
+            #     psf_list.append(fits.open(os.path.join(
+            #         obj['dir'], f's18a_wide_{obj[ID_name]}_{filt}_psf.fits')))
+            psf_list.append(fits.open(os.path.join(
+                obj['dir'], f"{obj['prefix']}_{filt}_psf.fits")))
 
         # Reconstruct data
         images = np.array([hdu[1].data for hdu in cutout if len(hdu) > 1])
         # note: all bands share the same WCS here
         w = wcs.WCS(cutout[0][1].header)
         weights = 1 / np.array([hdu[3].data for hdu in cutout])
-        psf_pad = padding_PSF(psf_list)  # Padding PSF cutouts from HSC
+        psf_pad = [padding_PSF(_psf) for _psf in psf_list]
+        # padding_PSF(psf_list)  # Padding PSF cutouts from HSC
         data = Data(images=images, weights=weights, wcs=w,
                     psfs=psf_pad, channels=channels)
     except Exception as e:
@@ -86,13 +131,17 @@ def fitting_obj(index, obj_cat, meas_cat, point_source=False,
                          'sersicindex': False},  # don't fix shape/sersic
             verbose=False)
 
+        temp = model_dict[ref_filt].catalog.copy()
+        temp = temp[model_dict[ref_filt].target_ind:model_dict[ref_filt].target_ind + 1]
+
         for filt in forced_channels:
             pos = True
             fix_all = True
-            ref_catalog = model_dict[ref_filt].catalog.copy()
+            # ref_catalog = model_dict[ref_filt].catalog.copy(
+            # )[model_dict[ref_filt].target_ind:model_dict[ref_filt].target_ind + 1]
             model_dict[filt], _ = tractor_hsc_sep_blob_by_blob(
                 obj, filt, data.channels, data,
-                fix_all=fix_all, tractor_cat=ref_catalog,
+                fix_all=fix_all, tractor_cat=copy.deepcopy(temp),
                 obj_cat=_obj_cat_i,
                 freeze_dict={'pos': pos, 'shape': True, 'shape.re': True, 'shape.ab': True, 'shape.phi': True,
                              'sersicindex': True},  # don't fix shape/sersic
@@ -105,6 +154,45 @@ def fitting_obj(index, obj_cat, meas_cat, point_source=False,
         row = _write_to_row(row, model_dict, channels=channels)
     except Exception as e:
         print(f'MEAUREMENT ERROR FOR {index} = obj {obj[ID_name]}', e)
+
+    try:
+        # Visualize our model
+        channels = list('griz') + ['N708', 'N540']
+        from kuaizi.tractor.utils import HiddenPrints
+        with HiddenPrints():
+            # model_img = np.asarray([
+            #     model_dict[key].getModelImage(
+            #         0, srcs=model_dict[key].catalog[model_dict[key].target_ind:model_dict[key].target_ind + 1]
+            #     ) for key in channels])
+            model_img = np.asarray([
+                model_dict[key].getModelImage(
+                    0, srcs=model_dict[key].catalog
+                ) for key in channels])
+        fig, [ax1, ax2, ax3] = plt.subplots(1, 3, figsize=(11, 5))
+        Q = 1.5
+        stretch = 0.7
+        _img = np.vstack([data.images[0:4], data.images[-2:]])
+        _, img_rgb = display_merian_cutout_rgb(_img, filters=list('griz') + ['N708', 'N540'],
+                                               ax=ax1, color_norm=None, Q=Q, stretch=stretch,
+                                               channel_map=None, N708_strength=3)
+
+        _, _ = display_merian_cutout_rgb(model_img, filters=list('griz') + ['N708', 'N540'],
+                                         ax=ax2, Q=Q, stretch=stretch,
+                                         color_norm=None,
+                                         channel_map=None)
+
+        _, _ = display_merian_cutout_rgb(_img - model_img, filters=list('griz') + ['N708', 'N540'],
+                                         ax=ax3, Q=Q, stretch=stretch,
+                                         color_norm=None,
+                                         channel_map=None)
+        plt.subplots_adjust(wspace=0.03)
+        plt.tight_layout()
+        plt.savefig(
+            f"/tigress/jiaxuanl/public_html/Merian/stars/{obj['prefix']}_tractor.png")
+        plt.close()
+    except Exception as e:
+        print(f'VISUALIZATION ERROR FOR {index} = obj {obj[ID_name]}', e)
+
     return row
 
 
@@ -218,7 +306,7 @@ def multiprocess_fitting_magellan(cat_dir, suffix='', point_source=True, njobs=1
 if __name__ == '__main__':
     fire.Fire(multiprocess_fitting_magellan)
 
-# python tractor_fitting.py /scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/stars-2022-04-25.fits \
-# --point_source "True" --suffix "stars" --njobs 3 \
-# --low 0 --high 3 --ind_list None --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
+# python tractor_fitting.py /scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/stars-2022-05-29.fits \
+# --point_source "True" --suffix "stars" --njobs 1 \
+# --low 420 --high 421 --ind_list None --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
 # --CUTOUT_SUBDIR './Cutout/stars/' --CATALOG_SUBDIR './Catalogs/stars/' \

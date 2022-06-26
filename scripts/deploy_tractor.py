@@ -3,13 +3,13 @@ import sys
 import fire
 
 SUFFIX = 'stars'  # 'lowz_calexp'
-CAT_DIR = "/scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/stars-2022-04-25.fits"
+CAT_DIR = "/scratch/gpfs/jiaxuanl/Data/Merian/Cutout/stars/stars-2022-05-29.fits"
 
 
 def deploy_modeling_job(low=0, high=100, ind_list=None, name='trctr_job', ncpu=12, njobs=44,
                         point_source=False,
                         DATADIR='/scratch/gpfs/jiaxuanl/Data/Merian',
-                        CUTOUT_SUBDIR='./Cutout/_new/',
+                        CUTOUT_SUBDIR='./Cutout/stars/',
                         CATALOG_SUBDIR='./Catalogs/'):
     ''' 
     create slurm script and then submit 
@@ -37,7 +37,7 @@ def deploy_modeling_job(low=0, high=100, ind_list=None, name='trctr_job', ncpu=1
         'echo "start time ... $now"',
         "",
         "module purge",
-        ". /home/jiaxuanl/Research/Merian/setup_env.sh",
+        "source /home/jiaxuanl/Research/Merian/merian_tractor/scripts/setup_env.sh",
         "export OMP_NUM_THREADS=1",
         "",
         run_tractor_content,
@@ -71,7 +71,6 @@ if __name__ == '__main__':
 # python deploy_tractor.py --low 1500 --high None --ncpu 15 --njobs 54 --name trctr_job4
 
 # python deploy_tractor.py --low 500 --high 510 --ncpu 1 --njobs 3 --name trctr_job
-
 
 # python deploy_tractor.py --low 0 --high 400 --ncpu 15 --njobs 54 --name trctr_job --DATADIR /scratch/gpfs/jiaxuanl/Data/Merian \
 # --CUTOUT_SUBDIR './Cutout/magellan_spec/' --CATALOG_SUBDIR './Catalogs/magellan/'
