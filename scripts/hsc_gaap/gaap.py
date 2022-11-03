@@ -13,6 +13,7 @@ import lsst.meas.extensions.gaap
 import lsst.daf.butler as dafButler
 import astropy.units as u
 
+
 class GaapTask(object):
     def __init__(self, tract, patch, band, repo='/projects/MERIAN/repo/', collections='S20A/deepCoadd_calexp', is_merian=False):
         self.tract = tract
@@ -90,4 +91,45 @@ class GaapTask(object):
         outCat = self.measCat.copy(deep=True).asAstropy()
         outCat['coord_ra'] = outCat['coord_ra'].to(u.deg)
         outCat['coord_dec'] = outCat['coord_dec'].to(u.deg)
-        # self.measCat.writeFits(filename)
+
+        old_gaap_cols = [
+            item for item in self.measCat.schema.getNames() if 'gaap' in item]
+        outCat = outCat[['objectId', 'coord_ra', 'coord_dec'] + old_gaap_cols]
+
+        # PhotCalib
+        for col in old_gaap_cols:
+            if 'instFlux' in col:
+                outCat[col] = outCat[col].value * \
+                    self.exposure.photoCalib.instFluxToMagnitude(
+                        1) * u.nanomaggy
+
+        new_gaap_cols = []
+        for col in old_gaap_cols:
+            name = col.replace('ext_gaap_GaapFlux', f'{self.band}_gaap')
+            name = name.replace('_instFlux', 'Flux').replace('PsfFlux', 'Psf')
+            if 'Flux' in name:
+                aper = name.split(
+                    "x_")[-1].replace('FluxErr', '').replace('Flux', '')
+                name = name.replace('_1_15x', '')
+                name = name.replace('_' + aper, aper.replace('_', 'p'))
+
+            if 'flag' in name:
+                aper = name.split(
+                    "x_")[-1].replace('_flag_bigPsf', '').replace('_flag', '')
+                name = name.replace('_1_15x', '')
+                if not 'gauss' in name:
+                    name = name.replace(
+                        '_' + aper, aper.replace('_', 'p') + 'Flux')
+            new_gaap_cols.append(name)
+
+        outCat.rename_columns(old_gaap_cols, new_gaap_cols)
+        self.outCatDir = os.path.join(self.repo, self.collections.split('/')[0], 'gaapTable',
+                                      str(self.tract), str(
+            self.patch_old))
+        self.outCatFileName = os.path.join(self.outCatDir,
+                                           f'gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}.fits')
+        if not os.path.isdir(self.outCatDir):
+            os.makedirs(self.outCatDir)
+        outCat.write(self.outCatFileName, overwrite=True)
+        print('Wrote GAaP table to', self.outCatFileName)
+        return outCat
