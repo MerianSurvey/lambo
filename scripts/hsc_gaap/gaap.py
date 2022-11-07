@@ -65,20 +65,25 @@ class GaapTask(object):
         measureConfig.plugins.names.add("ext_gaap_GaapFlux")
         measureConfig.plugins.names.add("base_SdssShape")
         measureConfig.plugins.names.add("base_SdssCentroid")
-        measureConfig.plugins.names.add("ext_gaap_GaapFlux")
         measureConfig.plugins["ext_gaap_GaapFlux"].doMeasure = True
         measureConfig.plugins["ext_gaap_GaapFlux"].doPsfPhotometry = True
         measureConfig.plugins["ext_gaap_GaapFlux"].doOptimalPhotometry = True
         measureConfig.plugins["ext_gaap_GaapFlux"].sigmas = [
             0.3, 0.4, 0.5, 0.6, 0.75, 1.0, 1.5, 2.0]
+        measureConfig.plugins["ext_gaap_GaapFlux"].scalingFactors = [
+            1.15, 1.25, 1.5]
         self.measureConfig = measureConfig
 
     def run(self):
         measureTask = lsst.meas.base.ForcedMeasurementTask(
             refSchema=self.refCat.schema, config=self.measureConfig)
         measCat = measureTask.generateMeasCat(
-            self.refExposure, self.refCat, self.refExposure.wcs, self.refCat.getIdFactory())
-
+            self.exposure, self.refCat, self.refExposure.wcs, self.refCat.getIdFactory)
+        measureTask.attachTransformedFootprints(
+            measCat, self.refCat, self.refExposure, self.refExposure.wcs)
+        self.measCat = measCat
+        self.measCat['id'] = self.measCat['objectId']
+        # return
         print("# Starting the GAaP measureTask at ", time.ctime())
         t1 = time.time()
         measureTask.run(measCat, self.exposure,
@@ -128,6 +133,7 @@ class GaapTask(object):
             self.patch_old))
         self.outCatFileName = os.path.join(self.outCatDir,
                                            f'gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}.fits')
+        self.outCat = outCat
         if not os.path.isdir(self.outCatDir):
             os.makedirs(self.outCatDir)
         outCat.write(self.outCatFileName, overwrite=True)
