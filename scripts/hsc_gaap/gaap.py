@@ -12,6 +12,7 @@ import lsst.pex.exceptions
 import lsst.meas.extensions.gaap
 import lsst.daf.butler as dafButler
 import astropy.units as u
+from astropy.table import QTable
 
 
 class GaapTask(object):
@@ -36,22 +37,29 @@ class GaapTask(object):
         self.merian = GaapTask(self.tract, self.patch,
                                band, repo, collections, is_merian=True)
         self.merian.butler = dafButler.Butler(repo)
-        dataId = dict(tract=self.tract, patch=self.patch, band=band)
+        self.merian.dataId = dict(tract=self.tract, patch=self.patch,
+                                  band=band, skymap='hsc_rings_v1')
         self.refCat = self.merian.butler.get(
             'deepCoadd_forced_src',
             collections=self.merian.collections,
-            dataId=dataId,
+            dataId=self.merian.dataId,
             instrument='DECam',
-            skymap='hsc_rings_v1',
+        )
+        self.refCatInBand = self.merian.butler.get(
+            'deepCoadd_ref',
+            collections='DECam/runs/merian/dr1_wide',
+            dataId=self.merian.dataId,
+            instrument='DECam',
         )
         if range is not None:
             self.refCat = self.refCat[range[0]:range[1]]
+            self.refCatInBand = self.refCatInBand[range[0]:range[1]]
+
         self.refExposure = self.merian.butler.get(
             'deepCoadd_calexp',
             collections=self.merian.collections,
-            dataId=dataId,
+            dataId=self.merian.dataId,
             instrument='DECam',
-            skymap='hsc_rings_v1',
         )
         print('Loaded Merian reference catalog and image')
 
@@ -61,33 +69,38 @@ class GaapTask(object):
         print('Loaded HSC deepCoadd_calexp image')
 
     def setDefaultMeasureConfig(self):
-        measureConfig = lsst.meas.base.ForcedMeasurementConfig()
-        measureConfig.plugins.names.add("ext_gaap_GaapFlux")
-        measureConfig.plugins.names.add("base_SdssShape")
-        measureConfig.plugins.names.add("base_SdssCentroid")
-        measureConfig.plugins["ext_gaap_GaapFlux"].doMeasure = True
-        measureConfig.plugins["ext_gaap_GaapFlux"].doPsfPhotometry = True
-        measureConfig.plugins["ext_gaap_GaapFlux"].doOptimalPhotometry = True
-        measureConfig.plugins["ext_gaap_GaapFlux"].sigmas = [
-            0.3, 0.4, 0.5, 0.6, 0.75, 1.0, 1.5, 2.0]
-        measureConfig.plugins["ext_gaap_GaapFlux"].scalingFactors = [
-            1.15, 1.25, 1.5]
+        measureConfig = lsst.meas.base.ForcedPhotCoaddConfig()
+        measureConfig.footprintDatasetName = 'DeblendedFlux'
+        measureConfig.measurement.plugins.names.add("ext_gaap_GaapFlux")
+        measureConfig.measurement.plugins.names.add("base_SdssShape")
+        measureConfig.measurement.plugins.names.add("base_SdssCentroid")
+        measureConfig.measurement.plugins.names.add("ext_gaap_GaapFlux")
+        measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doMeasure = True
+        measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doPsfPhotometry = True
+        measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doOptimalPhotometry = True
+        measureConfig.measurement.plugins["ext_gaap_GaapFlux"].sigmas = [
+            0.3, 0.4, 0.5, 0.6, 0.7, 1.0, 1.5, 2.0]
+        # measureConfig.measurement.plugins["ext_gaap_GaapFlux"].scalingFactors = [
+        #     1.5]
+        # [1.15, 1.25, 1.5]
         self.measureConfig = measureConfig
 
     def run(self):
-        measureTask = lsst.meas.base.ForcedMeasurementTask(
+        measureTask = lsst.meas.base.ForcedPhotCoaddTask(
             refSchema=self.refCat.schema, config=self.measureConfig)
-        measCat = measureTask.generateMeasCat(
-            self.exposure, self.refCat, self.refExposure.wcs, self.refCat.getIdFactory)
-        measureTask.attachTransformedFootprints(
-            measCat, self.refCat, self.refExposure, self.refExposure.wcs)
+        measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.merian.butler.registry.expandDataId(self.merian.dataId),
+                                                          exposure=self.exposure,
+                                                          refCat=self.refCat,
+                                                          refCatInBand=self.refCatInBand,
+                                                          refWcs=self.refExposure.wcs,
+                                                          idPackerName='tract_patch',
+                                                          footprintData=self.refCatInBand)
         self.measCat = measCat
-        self.measCat['id'] = self.measCat['objectId']
         # return
         print("# Starting the GAaP measureTask at ", time.ctime())
         t1 = time.time()
-        measureTask.run(measCat, self.exposure,
-                        refCat=self.refCat, refWcs=self.refExposure.wcs)
+        measureTask.run(measCat, self.exposure, refCat=self.refCat,
+                        refWcs=self.refExposure.wcs, exposureId=exposureID)
         t2 = time.time()
         print("# Finished the GAaP measureTask in %.2f seconds." % (t2 - t1))
         self.measCat = measCat
@@ -98,15 +111,17 @@ class GaapTask(object):
         outCat['coord_dec'] = outCat['coord_dec'].to(u.deg)
 
         old_gaap_cols = [
-            item for item in self.measCat.schema.getNames() if 'gaap' in item]
-        outCat = outCat[['objectId', 'coord_ra', 'coord_dec'] + old_gaap_cols]
+            item for item in self.measCat.schema.getNames() if 'gaap' in item and 'apCorr' not in item]
+        outCat = outCat[['id', 'coord_ra', 'coord_dec'] + old_gaap_cols]
 
         # PhotCalib
         for col in old_gaap_cols:
             if 'instFlux' in col:
                 outCat[col] = outCat[col].value * \
-                    self.exposure.photoCalib.instFluxToMagnitude(
-                        1) * u.nanomaggy
+                    self.exposure.getPhotoCalib().instFluxToNanojansky(1) * u.nanomaggy
+                # outCat[col] = outCat[col].value * \
+                #     self.exposure.photoCalib.instFluxToMagnitude(
+                #         1) * u.nanomaggy
 
         new_gaap_cols = []
         for col in old_gaap_cols:
@@ -133,9 +148,10 @@ class GaapTask(object):
             self.patch_old))
         self.outCatFileName = os.path.join(self.outCatDir,
                                            f'gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}.fits')
-        self.outCat = outCat
+        self.outCat = QTable(outCat)
+
         if not os.path.isdir(self.outCatDir):
             os.makedirs(self.outCatDir)
-        outCat.write(self.outCatFileName, overwrite=True)
+        self.outCat.write(self.outCatFileName, overwrite=True)
         print('Wrote GAaP table to', self.outCatFileName)
-        return outCat
+        return self.outCat
