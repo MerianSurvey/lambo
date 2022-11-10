@@ -1,7 +1,4 @@
 import numpy as np
-import time
-import matplotlib.pyplot as plt
-import lsst.meas.base
 import lsst.pex.config
 
 import lsst.afw.table
@@ -9,11 +6,13 @@ import lsst.meas.algorithms
 import lsst.pex.exceptions
 import lsst.meas.extensions.gaap
 
-from astropy.io import fits
+import fire
 import sys
 import os
 import gc
 sys.path.append('/home/jiaxuanl/Research/Merian/merian_tractor/scripts/')
+import multiprocess as mp
+mp.freeze_support()
 
 old_patches = [name for name in os.listdir(
     "/projects/MERIAN/repo/S20A/deepCoadd_calexp/9813/")]
@@ -24,20 +23,37 @@ common_patches = np.intersect1d(new_patches, merian_patches)
 
 from hsc_gaap.gaap import GaapTask
 
-for patch in common_patches[:1]:
-    for filt in list('grizy'):
+
+def runGaap(patch):
+    assert patch in common_patches, "Patch not in common patches"
+    for filt in ['i']:  # list('igrzy'):
         print('### Processing patch', patch, 'band', filt)
         gaap = GaapTask(9813, patch, filt,
                         repo='/projects/MERIAN/repo/',
                         collections='S20A/deepCoadd_calexp')
         gaap._checkHSCfile()
-        gaap.load_merian_reference(band='N708',
+        gaap.load_merian_reference(band='N540',
                                    repo='/projects/MERIAN/repo/',
                                    collections='DECam/runs/merian/dr1_wide',
-                                   range=None  # (0, 9020)
+                                   #    range=(0, 200)
                                    )
         gaap.setDefaultMeasureConfig()
         gaap.run()
-        outcat = gaap.writeObjectTable()
+        _ = gaap.writeObjectTable()
         del gaap
         gc.collect()
+        print('\n')
+
+
+def runGaapMultiJobs(seed_low, seed_high, njobs=4):
+    patches = common_patches[seed_low:seed_high]
+    pool = mp.Pool(njobs)
+    pool.map(runGaap, patches)
+    pool.close()
+    pool.join()
+
+
+if __name__ == '__main__':
+    fire.Fire(runGaapMultiJobs)
+
+# python run_gaap.py --seed_low=20 --seed_high=23 --n_jobs=3

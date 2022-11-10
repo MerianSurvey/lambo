@@ -32,8 +32,9 @@ class GaapTask(object):
         if not os.path.isfile(self.filename):
             raise FileNotFoundError(f'File {self.filename} not found')
 
-    def load_merian_reference(self, band='N708', repo='/projects/MERIAN/repo/',
+    def load_merian_reference(self, band='N540', repo='/projects/MERIAN/repo/',
                               collections='DECam/runs/merian/dr1_wide', range=None):
+        self.merian_refBand = band
         self.merian = GaapTask(self.tract, self.patch,
                                band, repo, collections, is_merian=True)
         self.merian.butler = dafButler.Butler(repo)
@@ -79,7 +80,7 @@ class GaapTask(object):
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doPsfPhotometry = True
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doOptimalPhotometry = True
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].sigmas = [
-            0.3, 0.4, 0.5, 0.6, 0.7, 1.0, 1.5, 2.0]
+            0.4, 0.5, 0.6, 0.7, 1.0, 1.5, 2.0]
         # measureConfig.measurement.plugins["ext_gaap_GaapFlux"].scalingFactors = [
         #     1.5]
         # [1.15, 1.25, 1.5]
@@ -99,13 +100,16 @@ class GaapTask(object):
         # return
         print("# Starting the GAaP measureTask at ", time.ctime())
         t1 = time.time()
-        measureTask.run(measCat, self.exposure, refCat=self.refCat,
-                        refWcs=self.refExposure.wcs, exposureId=exposureID)
+        measureTask.run(measCat,
+                        self.exposure,
+                        refCat=self.refCat,
+                        refWcs=self.refExposure.wcs,
+                        exposureId=exposureID)
         t2 = time.time()
         print("# Finished the GAaP measureTask in %.2f seconds." % (t2 - t1))
         self.measCat = measCat
 
-    def writeObjectTable(self):
+    def writeObjectTable(self, save=True):
         outCat = self.measCat.copy(deep=True).asAstropy()
         outCat['coord_ra'] = outCat['coord_ra'].to(u.deg)
         outCat['coord_dec'] = outCat['coord_dec'].to(u.deg)
@@ -119,9 +123,6 @@ class GaapTask(object):
             if 'instFlux' in col:
                 outCat[col] = outCat[col].value * \
                     self.exposure.getPhotoCalib().instFluxToNanojansky(1) * u.nanomaggy
-                # outCat[col] = outCat[col].value * \
-                #     self.exposure.photoCalib.instFluxToMagnitude(
-                #         1) * u.nanomaggy
 
         new_gaap_cols = []
         for col in old_gaap_cols:
@@ -147,11 +148,12 @@ class GaapTask(object):
                                       str(self.tract), str(
             self.patch_old))
         self.outCatFileName = os.path.join(self.outCatDir,
-                                           f'gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}.fits')
+                                           f'gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}_ref{self.merian_refBand}.fits')
         self.outCat = QTable(outCat)
 
-        if not os.path.isdir(self.outCatDir):
-            os.makedirs(self.outCatDir)
-        self.outCat.write(self.outCatFileName, overwrite=True)
-        print('Wrote GAaP table to', self.outCatFileName)
+        if save:
+            if not os.path.isdir(self.outCatDir):
+                os.makedirs(self.outCatDir)
+            self.outCat.write(self.outCatFileName, overwrite=True)
+            print('Wrote GAaP table to', self.outCatFileName)
         return self.outCat
