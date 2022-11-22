@@ -5,7 +5,8 @@ import lsst.afw.table
 import lsst.meas.algorithms
 import lsst.pex.exceptions
 import lsst.meas.extensions.gaap
-
+from functools import partial
+from itertools import product
 import fire
 import sys
 import os
@@ -24,31 +25,42 @@ common_patches = np.intersect1d(new_patches, merian_patches)
 from hsc_gaap.gaap import GaapTask
 
 
-def runGaap(patch):
+def runGaap(patch_filt, hsc_type='w_2022_40'):
+    patch, filt = patch_filt
     assert patch in common_patches, "Patch not in common patches"
-    for filt in ['i']:  # list('igrzy'):
-        print('### Processing patch', patch, 'band', filt)
-        gaap = GaapTask(9813, patch, filt,
+    print('### Processing patch', patch, 'band', filt)
+    if hsc_type == 'S20A':
+        gaap = GaapTask(9813, patch, filt, hsc_type='S20A',
                         repo='/projects/MERIAN/repo/',
                         collections='S20A/deepCoadd_calexp')
         gaap._checkHSCfile()
-        gaap.load_merian_reference(band='N540',
-                                   repo='/projects/MERIAN/repo/',
-                                   collections='DECam/runs/merian/dr1_wide',
-                                   #    range=(0, 200)
-                                   )
-        gaap.setDefaultMeasureConfig()
-        gaap.run()
-        _ = gaap.writeObjectTable()
-        del gaap
-        gc.collect()
-        print('\n')
+    elif hsc_type == 'w_2022_40':
+        gaap = GaapTask(9813, patch, filt, hsc_type='w_2022_40',
+                        repo='/projects/HSC/repo/main',
+                        collections='HSC/runs/RC2/w_2022_40/DM-36151')
+    elif hsc_type == 'w_2022_04':
+        gaap = GaapTask(9813, patch, filt, hsc_type='w_2022_04',
+                        repo='/projects/MERIAN/repo/',
+                        collections='HSC/runs/RC2/w_2022_04/DM-33402')
+
+    gaap.load_merian_reference(band='N540',
+                               repo='/projects/MERIAN/repo/',
+                               collections='DECam/runs/merian/dr1_wide',
+                               #    range=(0, 15)
+                               )
+    gaap.setDefaultMeasureConfig()
+    gaap.run()
+    _ = gaap.writeObjectTable()
+    del gaap
+    gc.collect()
+    print('\n')
 
 
-def runGaapMultiJobs(seed_low, seed_high, njobs=4):
+def runGaapMultiJobs(seed_low, seed_high, bands='gri', njobs=4, hsc_type='w_2022_40'):
     patches = common_patches[seed_low:seed_high]
+    iterables = product(patches, list(bands))
     pool = mp.Pool(njobs)
-    pool.map(runGaap, patches)
+    pool.map(partial(runGaap, hsc_type=hsc_type), iterables)
     pool.close()
     pool.join()
 
@@ -56,4 +68,5 @@ def runGaapMultiJobs(seed_low, seed_high, njobs=4):
 if __name__ == '__main__':
     fire.Fire(runGaapMultiJobs)
 
-# python run_gaap.py --seed_low=20 --seed_high=23 --n_jobs=3
+# python run_gaap.py --seed_low=20 --seed_high=23 --njobs=9 --hsc_type="w_2022_40"
+# python run_gaap.py --seed_low=20 --seed_high=23 --njobs=9 --hsc_type="w_2022_04"

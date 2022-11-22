@@ -12,11 +12,13 @@ import lsst.pex.exceptions
 import lsst.meas.extensions.gaap
 import lsst.daf.butler as dafButler
 import astropy.units as u
-from astropy.table import QTable
+from astropy.table import QTable, Table, hstack, vstack
 
 
 class GaapTask(object):
-    def __init__(self, tract, patch, band, repo='/projects/MERIAN/repo/', collections='S20A/deepCoadd_calexp', is_merian=False):
+    def __init__(self, tract, patch, band, hsc_type='S20A',
+                 repo='/projects/MERIAN/repo/', collections='S20A/deepCoadd_calexp',
+                 is_merian=False):
         self.tract = tract
         self.patch = patch
         self.band = band
@@ -24,6 +26,7 @@ class GaapTask(object):
         self.collections = collections
         self.patch_old = f'{self.patch % 9},{self.patch // 9}'
         if not is_merian:
+            self.hsc_type = hsc_type
             self._get_exposure()
 
     def _checkHSCfile(self):
@@ -35,8 +38,9 @@ class GaapTask(object):
     def load_merian_reference(self, band='N540', repo='/projects/MERIAN/repo/',
                               collections='DECam/runs/merian/dr1_wide', range=None):
         self.merian_refBand = band
-        self.merian = GaapTask(self.tract, self.patch,
-                               band, repo, collections, is_merian=True)
+        self.merian = GaapTask(self.tract, self.patch, None,
+                               band, repo, collections,
+                               is_merian=True)
         self.merian.butler = dafButler.Butler(repo)
         self.merian.dataId = dict(tract=self.tract, patch=self.patch,
                                   band=band, skymap='hsc_rings_v1')
@@ -65,14 +69,38 @@ class GaapTask(object):
         print('Loaded Merian reference catalog and image')
 
     def _get_exposure(self):
-        self._checkHSCfile()
-        self.exposure = lsst.afw.image.ExposureF(self.filename)
-        print('Loaded HSC deepCoadd_calexp image')
+        if self.hsc_type == 'S20A':
+            self._checkHSCfile()
+            self.exposure = lsst.afw.image.ExposureF(self.filename)
+        elif self.hsc_type == 'w_2022_04':
+            assert self.hsc_type in self.collections, 'w04 data not in repo'
+            butler = dafButler.Butler(self.repo)
+            dataId = dict(tract=self.tract, patch=self.patch, band=self.band)
+            self.exposure = butler.get(
+                'deepCoadd_calexp',
+                collections=self.collections,
+                dataId=dataId,
+                instrument='HSC',
+                skymap='hsc_rings_v1',
+            )
+        elif self.hsc_type == 'w_2022_40':
+            assert self.hsc_type in self.collections, 'w40 data not in repo'
+            butler = dafButler.Butler(self.repo)
+            dataId = dict(tract=self.tract, patch=self.patch, band=self.band)
+            self.exposure = butler.get(
+                'deepCoadd_calexp',
+                collections=self.collections,
+                dataId=dataId,
+                instrument='HSC',
+                skymap='hsc_rings_v1',
+            )
+        print(f'Loaded HSC {self.hsc_type} deepCoadd_calexp image')
 
     def setDefaultMeasureConfig(self):
         measureConfig = lsst.meas.base.ForcedPhotCoaddConfig()
         measureConfig.footprintDatasetName = 'DeblendedFlux'
-        measureConfig.measurement.plugins.names.add("ext_gaap_GaapFlux")
+        measureConfig.measurement.plugins.names.add("base_PsfFlux")
+        measureConfig.measurement.plugins.names.add("base_CircularApertureFlux")
         measureConfig.measurement.plugins.names.add("base_SdssShape")
         measureConfig.measurement.plugins.names.add("base_SdssCentroid")
         measureConfig.measurement.plugins.names.add("ext_gaap_GaapFlux")
@@ -144,11 +172,11 @@ class GaapTask(object):
             new_gaap_cols.append(name)
 
         outCat.rename_columns(old_gaap_cols, new_gaap_cols)
-        self.outCatDir = os.path.join(self.repo, self.collections.split('/')[0], 'gaapTable',
+        self.outCatDir = os.path.join('/projects/MERIAN/repo/', 'S20A', 'gaapTable',
                                       str(self.tract), str(
-            self.patch_old))
+                                          self.patch_old))
         self.outCatFileName = os.path.join(self.outCatDir,
-                                           f'gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}_ref{self.merian_refBand}.fits')
+                                           f'gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}_{self.hsc_type}.fits')
         self.outCat = QTable(outCat)
 
         if save:
@@ -157,3 +185,49 @@ class GaapTask(object):
             self.outCat.write(self.outCatFileName, overwrite=True)
             print('Wrote GAaP table to', self.outCatFileName)
         return self.outCat
+
+
+def joinCatBands(patch=23, filters='griz', tract=9813, hsc_type='w_2022_40'):
+    """
+    Merge catalogs in multiple bands
+    """
+    cats = []
+    patch_old = f'{patch % 9},{patch // 9}'
+    for i, filt in enumerate(list(filters)):
+        temp = Table.read(
+            f'/projects/MERIAN/repo/S20A/gaapTable/{tract}/{patch_old}/gaapTable_{filt.upper()}_{tract}_{patch_old}_{hsc_type}.fits')
+        if i > 0:
+            temp.remove_columns(['id', 'coord_ra', 'coord_dec'])
+        cats.append(temp)
+    return hstack(cats)
+
+
+def joinCatPatches(patches, filters='griz', tract=9813, hsc_type='w_2022_40'):
+    """
+    Concatenate catalogs in multiple patches
+    """
+    cats = []
+    for i in patches:
+        cats.append(joinCatBands(patch=i, filters=filters,
+                    tract=tract, hsc_type=hsc_type))
+    return vstack(cats)
+
+
+def joinMerianCatPatches(patches, tract=9813):
+    import lsst.daf.butler as dafButler
+    butler = dafButler.Butler('/projects/MERIAN/repo/')
+
+    cats = []
+    for patch in patches:
+        patch_old = f'{patch % 9},{patch // 9}'
+        dataId = dict(tract=tract, patch=patch)
+        refCat = butler.get(
+            'objectTable',
+            collections='DECam/runs/merian/dr1_wide',
+            dataId=dataId,
+            instrument='DECam',
+            skymap='hsc_rings_v1',
+        )
+        refCat = Table.from_pandas(refCat, index=True)
+        cats.append(refCat)
+    return vstack(cats)
