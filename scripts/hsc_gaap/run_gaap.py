@@ -22,7 +22,7 @@ merian_patches = [int(name) for name in os.listdir(
     "/projects/MERIAN/repo/DECam/runs/merian/dr1_wide/20220921T193246Z/deepCoadd_forced_src/9813")]
 common_patches = np.intersect1d(new_patches, merian_patches)
 
-from hsc_gaap.gaap import GaapTask
+from hsc_gaap.gaap import GaapTask, joinMerianCatPatches
 
 
 def runGaap(patch_filt, hsc_type='w_2022_40'):
@@ -43,20 +43,27 @@ def runGaap(patch_filt, hsc_type='w_2022_40'):
                         repo='/projects/MERIAN/repo/',
                         collections='HSC/runs/RC2/w_2022_04/DM-33402')
 
-    gaap.load_merian_reference(band='N540',
+    gaap.load_merian_reference(band='N708',
                                repo='/projects/MERIAN/repo/',
                                collections='DECam/runs/merian/dr1_wide',
-                               #    range=(0, 15)
                                )
     gaap.setDefaultMeasureConfig()
     gaap.run()
+    cat2 = gaap.writeObjectTable(save=True)
+    cat_ref = joinMerianCatPatches([23])
+    cat_ref = cat_ref[np.in1d(cat_ref['objectId'], cat2['id'])]
+    # cat2.remove_columns(['id', 'coord_ra', 'coord_dec'])
+    # cat = hstack([cat_ref, cat2])
+    cat_ref.write(
+        f'/projects/MERIAN/repo/S20A/gaapTable/9813/5,2/MerianTable_{gaap.band.upper()}_{gaap.tract}_{gaap.patch_old}.fits')
+
     _ = gaap.writeObjectTable()
     del gaap
     gc.collect()
     print('\n')
 
 
-def runGaapMultiJobs(seed_low, seed_high, bands='gri', njobs=4, hsc_type='w_2022_40'):
+def runGaapMultiJobs(seed_low, seed_high, bands='ri', njobs=4, hsc_type='w_2022_40'):
     patches = common_patches[seed_low:seed_high]
     iterables = product(patches, list(bands))
     pool = mp.Pool(njobs)
@@ -68,5 +75,5 @@ def runGaapMultiJobs(seed_low, seed_high, bands='gri', njobs=4, hsc_type='w_2022
 if __name__ == '__main__':
     fire.Fire(runGaapMultiJobs)
 
-# python run_gaap.py --seed_low=20 --seed_high=23 --njobs=9 --hsc_type="w_2022_40"
-# python run_gaap.py --seed_low=20 --seed_high=23 --njobs=9 --hsc_type="w_2022_04"
+# python run_gaap.py --seed_low=20 --seed_high=23 --njobs=9 --hsc_type="S20A"
+# python run_gaap.py --seed_low=20 --seed_high=23 --njobs=6 --hsc_type="w_2022_04"

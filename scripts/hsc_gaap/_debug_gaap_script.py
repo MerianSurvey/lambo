@@ -11,11 +11,6 @@ import lsst.meas.deblender
 import lsst.pex.exceptions
 import lsst.meas.extensions.gaap
 
-# from kuaizi.display import display_single
-# from astropy.io import fits
-# from astropy.table import Table, hstack
-
-
 # Load Merian catalog as reference
 # filt = 'i'
 filt = 'N708'

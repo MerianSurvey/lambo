@@ -18,12 +18,13 @@ from astropy.table import QTable, Table, hstack, vstack
 class GaapTask(object):
     def __init__(self, tract, patch, band, hsc_type='S20A',
                  repo='/projects/MERIAN/repo/', collections='S20A/deepCoadd_calexp',
-                 is_merian=False):
+                 is_merian=False, log_level='ERROR'):
         self.tract = tract
         self.patch = patch
         self.band = band
         self.repo = repo
         self.collections = collections
+        self.log_level = log_level
         self.patch_old = f'{self.patch % 9},{self.patch // 9}'
         if not is_merian:
             self.hsc_type = hsc_type
@@ -99,10 +100,15 @@ class GaapTask(object):
     def setDefaultMeasureConfig(self):
         measureConfig = lsst.meas.base.ForcedPhotCoaddConfig()
         measureConfig.footprintDatasetName = 'DeblendedFlux'
+        measureConfig.measurement.doReplaceWithNoise = False
+
         measureConfig.measurement.plugins.names.add("base_PsfFlux")
-        measureConfig.measurement.plugins.names.add("base_CircularApertureFlux")
+        measureConfig.measurement.plugins.names.add(
+            "base_CircularApertureFlux")
         measureConfig.measurement.plugins.names.add("base_SdssShape")
         measureConfig.measurement.plugins.names.add("base_SdssCentroid")
+        # measureConfig.measurement.plugins.names.add('base_Blendedness')
+
         measureConfig.measurement.plugins.names.add("ext_gaap_GaapFlux")
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doMeasure = True
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doPsfPhotometry = True
@@ -113,6 +119,16 @@ class GaapTask(object):
         #     1.5]
         # [1.15, 1.25, 1.5]
         self.measureConfig = measureConfig
+
+    def setLogger(self, task):
+        import logging
+        task.log.setLevel(self.log_level)
+        if not task.log.hasHandlers():
+            logger = logging.getLogger('simple_example')
+            logger.setLevel(logging.DEBUG)
+            ch = logging.StreamHandler()
+            ch.setLevel(logging.DEBUG)
+            task.log.addHandler(ch)
 
     def run(self):
         measureTask = lsst.meas.base.ForcedPhotCoaddTask(
@@ -144,6 +160,11 @@ class GaapTask(object):
 
         old_gaap_cols = [
             item for item in self.measCat.schema.getNames() if 'gaap' in item and 'apCorr' not in item]
+        old_gaap_cols += ['base_PsfFlux_instFlux',
+                          'base_PsfFlux_instFluxErr', 'base_PsfFlux_flag']
+        # old_gaap_cols += ['base_Blendedness_abs',
+        #                   'base_Blendedness_old', 'base_Blendedness_flag']
+
         outCat = outCat[['id', 'coord_ra', 'coord_dec'] + old_gaap_cols]
 
         # PhotCalib
@@ -154,7 +175,8 @@ class GaapTask(object):
 
         new_gaap_cols = []
         for col in old_gaap_cols:
-            name = col.replace('ext_gaap_GaapFlux', f'{self.band}_gaap')
+            name = col.replace('base', f'{self.band}')
+            name = name.replace('ext_gaap_GaapFlux', f'{self.band}_gaap')
             name = name.replace('_instFlux', 'Flux').replace('PsfFlux', 'Psf')
             if 'Flux' in name:
                 aper = name.split(

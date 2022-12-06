@@ -1,0 +1,487 @@
+# the name of the centroiding algorithm used to set source x,y
+config.measurement.slots.centroid='base_TransformedCentroid'
+
+# the name of the algorithm used to set source moments parameters
+config.measurement.slots.shape='base_TransformedShape'
+
+# the name of the algorithm used to set PSF moments parameters
+config.measurement.slots.psfShape='base_SdssShape_psf'
+
+# the name of the algorithm used to set the source aperture instFlux slot
+config.measurement.slots.apFlux=None
+
+# the name of the algorithm used to set the source psf instFlux slot
+config.measurement.slots.psfFlux='base_PsfFlux'
+
+# the name of the algorithm used to set the source Gaussian instFlux slot
+config.measurement.slots.gaussianFlux=None
+
+# the name of the instFlux measurement algorithm used for calibration
+config.measurement.slots.calibFlux=None
+
+# When measuring, replace other detected footprints with noise?
+config.measurement.doReplaceWithNoise=False
+
+# How to choose mean and variance of the Gaussian noise we generate?
+config.measurement.noiseReplacer.noiseSource='measure'
+
+# Add ann offset to the generated noise.
+config.measurement.noiseReplacer.noiseOffset=0.0
+
+# The seed multiplier value to use for random number generation:
+# >= 1: set the seed deterministically based on exposureId
+# 0: fall back to the afw.math.Random default constructor (which uses a seed value of 1)
+config.measurement.noiseReplacer.noiseSeedMultiplier=1
+
+# Prefix to give undeblended plugins
+config.measurement.undeblendedPrefix='undeblended_'
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_PsfFlux'].doMeasure=True
+
+# Mask planes that indicate pixels that should be excluded from the fit
+config.measurement.plugins['base_PsfFlux'].badMaskPlanes=[]
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_PeakLikelihoodFlux'].doMeasure=True
+
+# Name of warping kernel (e.g. "lanczos4") used to compute the peak
+config.measurement.plugins['base_PeakLikelihoodFlux'].warpingKernelName='lanczos4'
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_GaussianFlux'].doMeasure=True
+
+# FIXME! NEVER DOCUMENTED!
+config.measurement.plugins['base_GaussianFlux'].background=0.0
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_NaiveCentroid'].doMeasure=True
+
+# Value to subtract from the image pixel values
+config.measurement.plugins['base_NaiveCentroid'].background=0.0
+
+# Do check that the centroid is contained in footprint.
+config.measurement.plugins['base_NaiveCentroid'].doFootprintCheck=True
+
+# If set > 0, Centroid Check also checks distance from footprint peak.
+config.measurement.plugins['base_NaiveCentroid'].maxDistToPeak=-1.0
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_SdssCentroid'].doMeasure=True
+
+# maximum allowed binning
+config.measurement.plugins['base_SdssCentroid'].binmax=16
+
+# Do check that the centroid is contained in footprint.
+config.measurement.plugins['base_SdssCentroid'].doFootprintCheck=True
+
+# If set > 0, Centroid Check also checks distance from footprint peak.
+config.measurement.plugins['base_SdssCentroid'].maxDistToPeak=-1.0
+
+# if the peak's less than this insist on binning at least once
+config.measurement.plugins['base_SdssCentroid'].peakMin=-1.0
+
+# fiddle factor for adjusting the binning
+config.measurement.plugins['base_SdssCentroid'].wfac=1.5
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_PixelFlags'].doMeasure=True
+
+# List of mask planes to be searched for which occur anywhere within a footprint. If any of the planes are found they will have a corresponding pixel flag set.
+config.measurement.plugins['base_PixelFlags'].masksFpAnywhere=['CLIPPED', 'SENSOR_EDGE', 'REJECTED', 'INEXACT_PSF']
+
+# List of mask planes to be searched for which occur in the center of a footprint. If any of the planes are found they will have a corresponding pixel flag set.
+config.measurement.plugins['base_PixelFlags'].masksFpCenter=['CLIPPED', 'SENSOR_EDGE', 'REJECTED', 'INEXACT_PSF']
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_SdssShape'].doMeasure=True
+
+# Additional value to add to background
+config.measurement.plugins['base_SdssShape'].background=0.0
+
+# Whether to also compute the shape of the PSF model
+config.measurement.plugins['base_SdssShape'].doMeasurePsf=True
+
+# Maximum number of iterations
+config.measurement.plugins['base_SdssShape'].maxIter=100
+
+# Maximum centroid shift, limited to 2-10
+config.measurement.plugins['base_SdssShape'].maxShift=0.0
+
+# Convergence tolerance for e1,e2
+config.measurement.plugins['base_SdssShape'].tol1=9.999999747378752e-06
+
+# Convergence tolerance for FWHM
+config.measurement.plugins['base_SdssShape'].tol2=9.999999747378752e-05
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_ScaledApertureFlux'].doMeasure=True
+
+# Scaling factor of PSF FWHM for aperture radius.
+config.measurement.plugins['base_ScaledApertureFlux'].scale=3.14
+
+# Warping kernel used to shift Sinc photometry coefficients to different center positions
+config.measurement.plugins['base_ScaledApertureFlux'].shiftKernel='lanczos5'
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_CircularApertureFlux'].doMeasure=True
+
+# Maximum radius (in pixels) for which the sinc algorithm should be used instead of the faster naive algorithm.  For elliptical apertures, this is the minor axis radius.
+config.measurement.plugins['base_CircularApertureFlux'].maxSincRadius=12.0
+
+# Radius (in pixels) of apertures.
+config.measurement.plugins['base_CircularApertureFlux'].radii=[3.0, 4.5, 6.0, 9.0, 12.0, 17.0, 25.0, 35.0, 50.0, 70.0]
+
+# Warping kernel used to shift Sinc photometry coefficients to different center positions
+config.measurement.plugins['base_CircularApertureFlux'].shiftKernel='lanczos5'
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_Blendedness'].doMeasure=True
+
+# Whether to compute quantities related to the Gaussian-weighted flux
+config.measurement.plugins['base_Blendedness'].doFlux=True
+
+# Whether to compute HeavyFootprint dot products (the old deblend.blendedness parameter)
+config.measurement.plugins['base_Blendedness'].doOld=True
+
+# Whether to compute quantities related to the Gaussian-weighted shape
+config.measurement.plugins['base_Blendedness'].doShape=True
+
+# Radius factor that sets the maximum extent of the weight function (and hence the flux measurements)
+config.measurement.plugins['base_Blendedness'].nSigmaWeightMax=3.0
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_LocalBackground'].doMeasure=True
+
+# Inner radius for background annulus as a multiple of the PSF sigma
+config.measurement.plugins['base_LocalBackground'].annulusInner=7.0
+
+# Outer radius for background annulus as a multiple of the PSF sigma
+config.measurement.plugins['base_LocalBackground'].annulusOuter=15.0
+
+# Mask planes that indicate pixels that should be excluded from the measurement
+config.measurement.plugins['base_LocalBackground'].badMaskPlanes=['BAD', 'SAT', 'NO_DATA']
+
+# Number of sigma-clipping iterations for background measurement
+config.measurement.plugins['base_LocalBackground'].bgIter=3
+
+# Rejection threshold (in standard deviations) for background measurement
+config.measurement.plugins['base_LocalBackground'].bgRej=3.0
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_Variance'].doMeasure=True
+
+# Scale factor to apply to shape for aperture
+config.measurement.plugins['base_Variance'].scale=5.0
+
+# Mask planes to ignore
+config.measurement.plugins['base_Variance'].mask=['DETECTED', 'DETECTED_NEGATIVE', 'BAD', 'SAT']
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_InputCount'].doMeasure=True
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_LocalPhotoCalib'].doMeasure=True
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_LocalWcs'].doMeasure=True
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_PeakCentroid'].doMeasure=True
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_TransformedCentroid'].doMeasure=True
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_TransformedCentroidFromCoord'].doMeasure=True
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['base_TransformedShape'].doMeasure=True
+
+# Noise source.  How to choose variance of the zero-mean Gaussian noise added to image.
+# Allowed values:
+#   'meta': variance = the 'BGMEAN' metadata entry
+#   'variance': variance = the image's variance plane'
+# 
+
+# whether to run this plugin in single-object mode
+config.measurement.plugins['ext_gaap_GaapFlux'].doMeasure=True
+
+# List of sigmas (in arcseconds) of circular Gaussian apertures to apply on pre-seeing galaxy images. These should be somewhat larger than the PSF (determined by ``scalingFactors``) to avoid measurement failures.
+config.measurement.plugins['ext_gaap_GaapFlux'].sigmas=[0.5, 0.7, 1.0, 1.5, 2.5, 3.0]
+
+# List of factors with which the seeing should be scaled to obtain the sigma values of the target Gaussian PSF. The factor should not be less than unity to avoid the PSF matching task to go into deconvolution mode and should ideally be slightly greater than unity. The runtime of the plugin scales linearly with the number of elements in the list.
+config.measurement.plugins['ext_gaap_GaapFlux'].scalingFactors=[1.15]
+
+# Warping kernel
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].warpingConfig.warpingKernelName='lanczos3'
+
+# Warping kernel for mask (use ``warpingKernelName`` if '')
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].warpingConfig.maskWarpingKernelName='bilinear'
+
+# ``interpLength`` argument to `lsst.afw.math.warpExposure`
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].warpingConfig.interpLength=10
+
+# ``cacheSize`` argument to `lsst.afw.math.SeparableKernel.computeCache`
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].warpingConfig.cacheSize=1000000
+
+# mask bits to grow to full width of image/variance kernel,
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].warpingConfig.growFullMask=16
+
+# Value of footprint detection threshold
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].detectionConfig.detThreshold=10.0
+
+# Type of detection threshold
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].detectionConfig.detThresholdType='pixel_stdev'
+
+# If true run detection on the template (image to convolve);
+#                  if false run detection on the science image
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].detectionConfig.detOnTemplate=True
+
+# Mask planes that lead to an invalid detection.
+#                  Options: NO_DATA EDGE SAT BAD CR INTRP
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].detectionConfig.badMaskPlanes=['NO_DATA', 'EDGE', 'SAT']
+
+# Minimum number of pixels in an acceptable Footprint
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].detectionConfig.fpNpixMin=5
+
+# Maximum number of pixels in an acceptable Footprint;
+#                  too big and the subsequent convolutions become unwieldy
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].detectionConfig.fpNpixMax=500
+
+# If config.scaleByFwhm, grow the footprint based on
+#                  the final kernelSize.  Each footprint will be
+#                  2*fpGrowKernelScaling*kernelSize x
+#                  2*fpGrowKernelScaling*kernelSize.  With the value
+#                  of 1.0, the remaining pixels in each KernelCandiate
+#                  after convolution by the basis functions will be
+#                  equal to the kernel size itself.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].detectionConfig.fpGrowKernelScaling=1.0
+
+# Growing radius (in pixels) for each raw detection
+#                  footprint.  The smaller the faster; however the
+#                  kernel sum does not converge if the stamp is too
+#                  small; and the kernel is not constrained at all if
+#                  the stamp is the size of the kernel.  The grown stamp
+#                  is 2 * fpGrowPix pixels larger in each dimension.
+#                  This is overridden by fpGrowKernelScaling if scaleByFwhm
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].detectionConfig.fpGrowPix=30
+
+# Scale fpGrowPix by input Fwhm?
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].detectionConfig.scaleByFwhm=True
+
+# type of statistic to use for grid points
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.statisticsProperty='MEANCLIP'
+
+# behaviour if there are too few points in grid for requested interpolation style
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.undersampleStyle='REDUCE_INTERP_ORDER'
+
+# how large a region of the sky should be used for each background point
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.binSize=128
+
+# Sky region size to be used for each background point in X direction. If 0, the binSize config is used.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.binSizeX=0
+
+# Sky region size to be used for each background point in Y direction. If 0, the binSize config is used.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.binSizeY=0
+
+# how to interpolate the background values. This maps to an enum; see afw::math::Background
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.algorithm='AKIMA_SPLINE'
+
+# Names of mask planes to ignore while estimating the background
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.ignoredPixelMask=['BAD', 'EDGE', 'DETECTED', 'DETECTED_NEGATIVE', 'NO_DATA']
+
+# Ignore NaNs when estimating the background
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.isNanSafe=False
+
+# Use Approximate (Chebyshev) to model background.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.useApprox=True
+
+# Approximation order in X for background Chebyshev (valid only with useApprox=True)
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.approxOrderX=6
+
+# Approximation order in Y for background Chebyshev (valid only with useApprox=True)
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.approxOrderY=-1
+
+# Use inverse variance weighting in calculation (valid only with useApprox=True)
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].afwBackgroundConfig.weighting=True
+
+# Use afw background subtraction instead of ip_diffim
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].useAfwBackground=False
+
+# Include terms (including kernel cross terms) for background in ip_diffim
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].fitForBackground=False
+
+# Type of basis set for PSF matching kernel.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].kernelBasisSet='alard-lupton'
+
+# Number of rows/columns in the convolution kernel; should be odd-valued.
+#                  Modified by kernelSizeFwhmScaling if scaleByFwhm = true
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].kernelSize=21
+
+# Scale kernelSize, alardGaussians by input Fwhm
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].scaleByFwhm=True
+
+# Multiplier of the largest AL Gaussian basis sigma to get the kernel bbox (pixel) size.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].kernelSizeFwhmScaling=6.0
+
+# Minimum kernel bbox (pixel) size.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].kernelSizeMin=21
+
+# Maximum kernel bbox (pixel) size.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].kernelSizeMax=35
+
+# Type of spatial functions for kernel and background
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].spatialModelType='chebyshev1'
+
+# Spatial order of convolution kernel variation
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].spatialKernelOrder=0
+
+# Spatial order of differential background variation
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].spatialBgOrder=1
+
+# Size (rows) in pixels of each SpatialCell for spatial modeling
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].sizeCellX=128
+
+# Size (columns) in pixels of each SpatialCell for spatial modeling
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].sizeCellY=128
+
+# Number of KernelCandidates in each SpatialCell to use in the spatial fitting
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].nStarPerCell=3
+
+# Maximum number of iterations for rejecting bad KernelCandidates in spatial fitting
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].maxSpatialIterations=3
+
+# Use Pca to reduce the dimensionality of the kernel basis sets.
+#                  This is particularly useful for delta-function kernels.
+#                  Functionally, after all Cells have their raw kernels determined, we run
+#                  a Pca on these Kernels, re-fit the Cells using the eigenKernels and then
+#                  fit those for spatial variation using the same technique as for Alard-Lupton kernels.
+#                  If this option is used, the first term will have no spatial variation and the
+#                  kernel sum will be conserved.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].usePcaForSpatialKernel=False
+
+# Subtract off the mean feature before doing the Pca
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].subtractMeanForPca=True
+
+# Number of principal components to use for Pca basis, including the
+#                  mean kernel if requested.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].numPrincipalComponents=5
+
+# Do sigma clipping on each raw kernel candidate
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].singleKernelClipping=False
+
+# Do sigma clipping on the ensemble of kernel sums
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].kernelSumClipping=False
+
+# Do sigma clipping after building the spatial model
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].spatialKernelClipping=False
+
+# Test for maximum condition number when inverting a kernel matrix.
+#                  Anything above maxConditionNumber is not used and the candidate is set as BAD.
+#                  Also used to truncate inverse matrix in estimateBiasedRisk.  However,
+#                  if you are doing any deconvolution you will want to turn this off, or use
+#                  a large maxConditionNumber
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].checkConditionNumber=False
+
+# Mask planes to ignore when calculating diffim statistics
+#                  Options: NO_DATA EDGE SAT BAD CR INTRP
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].badMaskPlanes=['NO_DATA', 'EDGE', 'SAT']
+
+# Rejects KernelCandidates yielding bad difference image quality.
+#                  Used by BuildSingleKernelVisitor, AssessSpatialKernelVisitor.
+#                  Represents average over pixels of (image/sqrt(variance)).
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].candidateResidualMeanMax=0.25
+
+# Rejects KernelCandidates yielding bad difference image quality.
+#                  Used by BuildSingleKernelVisitor, AssessSpatialKernelVisitor.
+#                  Represents stddev over pixels of (image/sqrt(variance)).
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].candidateResidualStdMax=1.5
+
+# Use the core of the footprint for the quality statistics, instead of the entire footprint.
+#                  WARNING: if there is deconvolution we probably will need to turn this off
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].useCoreStats=False
+
+# Radius for calculation of stats in 'core' of KernelCandidate diffim.
+#                  Total number of pixels used will be (2*radius)**2.
+#                  This is used both for 'core' diffim quality as well as ranking of
+#                  KernelCandidates by their total flux in this core
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].candidateCoreRadius=3
+
+# Maximum allowed sigma for outliers from kernel sum distribution.
+#                  Used to reject variable objects from the kernel model
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].maxKsumSigma=3.0
+
+# Maximum condition number for a well conditioned matrix
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].maxConditionNumber=50000000.0
+
+# Use singular values (SVD) or eigen values (EIGENVALUE) to determine condition number
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].conditionNumberType='EIGENVALUE'
+
+# Maximum condition number for a well conditioned spatial matrix
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].maxSpatialConditionNumber=10000000000.0
+
+# Remake KernelCandidate using better variance estimate after first pass?
+#                  Primarily useful when convolving a single-depth image, otherwise not necessary.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].iterateSingleKernel=False
+
+# Use constant variance weighting in single kernel fitting?
+#                  In some cases this is better for bright star residuals.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].constantVarianceWeighting=True
+
+# Calculate kernel and background uncertainties for each kernel candidate?
+#                  This comes from the inverse of the covariance matrix.
+#                  Warning: regularization can cause problems for this step.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].calculateKernelUncertainty=False
+
+# Use Bayesian Information Criterion to select the number of bases going into the kernel
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].useBicForKernelBasis=False
+
+# Number of base Gaussians in alard-lupton kernel basis function generation.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].alardNGauss=1
+
+# Polynomial order of spatial modification of base Gaussians. List length must be `alardNGauss`.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].alardDegGauss=[4]
+
+# Default sigma values in pixels of base Gaussians. List length must be `alardNGauss`.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].alardSigGauss=[0.7, 1.5, 3.0]
+
+# Used if `scaleByFwhm==True`, scaling multiplier of base Gaussian sigmas for automated sigma determination
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].alardGaussBeta=1.0
+
+# Used if `scaleByFwhm==True`, minimum sigma (pixels) for base Gaussians
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].alardMinSig=0.7
+
+# Used if `scaleByFwhm==True`, degree of spatial modification of ALL base Gaussians in AL basis during deconvolution
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].alardDegGaussDeconv=1
+
+# Used if `scaleByFwhm==True`, minimum sigma (pixels) for base Gaussians during deconvolution; make smaller than `alardMinSig` as this is only indirectly used
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].alardMinSigDeconv=0.4
+
+# Used if `scaleByFwhm==True`, number of base Gaussians in AL basis during deconvolution
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel['AL'].alardNGaussDeconv=3
+
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.kernel.name='AL'
+# If too small, automatically pad the science Psf? Pad to smallest dimensions appropriate for the matching kernel dimensions, as specified by autoPadPsfTo. If false, pad by the padPsfBy config.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.doAutoPadPsf=True
+
+# Minimum Science Psf dimensions as a fraction of matching kernel dimensions. If the dimensions of the Psf to be matched are less than the matching kernel dimensions * autoPadPsfTo, pad Science Psf to this size. Ignored if doAutoPadPsf=False.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.autoPadPsfTo=1.4
+
+# Pixels (even) to pad Science Psf by before matching. Ignored if doAutoPadPsf=True
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.padPsfBy=0
+
+# Which type of convolution to use
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfMatch.convolutionMethod='auto'
+
+# The dimensions (width and height) of the target PSF image in pixels. Must be odd.
+config.measurement.plugins['ext_gaap_GaapFlux']._modelPsfDimension=65
+
+# Perform PSF photometry after PSF-Gaussianization to validate Gaussianization accuracy? This does not produce consistent color estimates. If setting it to `True`, it must be done so prior to registering the plugin for aperture correction if ``registerForApCorr`` is also `True`.
+config.measurement.plugins['ext_gaap_GaapFlux'].doPsfPhotometry=True
+
+# Perform optimal photometry with near maximal SNR using an adaptive elliptical aperture? This requires a shape algorithm to have been run previously.
+config.measurement.plugins['ext_gaap_GaapFlux'].doOptimalPhotometry=True
+
+# Register measurements for aperture correction? The aperture correction registration is done when the plugin is instatiated and not during import because the column names are derived from the configuration rather than being static. Sometimes you want to turn this off, e.g., when you use aperture corrections derived from somewhere else through a 'proxy' mechanism.
+config.measurement.plugins['ext_gaap_GaapFlux'].registerForApCorr=True
