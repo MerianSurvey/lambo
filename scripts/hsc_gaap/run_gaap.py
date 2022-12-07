@@ -50,21 +50,20 @@ def runGaap(patch_filt, hsc_type='w_2022_40'):
     gaap.setDefaultMeasureConfig()
     gaap.run()
     cat2 = gaap.writeObjectTable(save=True)
-    cat_ref = joinMerianCatPatches([23])
-    cat_ref = cat_ref[np.in1d(cat_ref['objectId'], cat2['id'])]
+    # cat_ref = joinMerianCatPatches([patch])
+    # cat_ref = cat_ref[np.in1d(cat_ref['objectId'], cat2['id'])]
     # cat2.remove_columns(['id', 'coord_ra', 'coord_dec'])
     # cat = hstack([cat_ref, cat2])
-    cat_ref.write(
-        f'/projects/MERIAN/repo/S20A/gaapTable/9813/5,2/MerianTable_{gaap.band.upper()}_{gaap.tract}_{gaap.patch_old}.fits')
-
-    _ = gaap.writeObjectTable()
+    # cat_ref.write(
+    #     f'/projects/MERIAN/repo/S20A/gaapTable/9813/{gaap.patch_old}/MerianTable_{gaap.band.upper()}_{gaap.tract}_{gaap.patch_old}.fits')
     del gaap
     gc.collect()
     print('\n')
 
 
-def runGaapMultiJobs(seed_low, seed_high, bands='ri', njobs=4, hsc_type='w_2022_40'):
-    patches = common_patches[seed_low:seed_high]
+def runGaapMultiJobs(patch_low, patch_high, bands='gri', njobs=4, hsc_type='w_2022_40'):
+    # common_patches[seed_low:seed_high]
+    patches = np.arange(patch_low, patch_high + 1, 1)
     iterables = product(patches, list(bands))
     pool = mp.Pool(njobs)
     pool.map(partial(runGaap, hsc_type=hsc_type), iterables)
@@ -75,5 +74,9 @@ def runGaapMultiJobs(seed_low, seed_high, bands='ri', njobs=4, hsc_type='w_2022_
 if __name__ == '__main__':
     fire.Fire(runGaapMultiJobs)
 
-# python run_gaap.py --seed_low=20 --seed_high=23 --njobs=9 --hsc_type="S20A"
-# python run_gaap.py --seed_low=20 --seed_high=23 --njobs=6 --hsc_type="w_2022_04"
+# python run_gaap.py --patch_low=22 --patch_high=25 --njobs=12 --hsc_type="S20A"
+# python run_gaap.py --patch_low=22 --patch_high=25 --njobs=12 --hsc_type="w_2022_40"
+
+# python run_gaap.py --patch_low=31 --patch_high=34 --njobs=12 --hsc_type="S20A"
+# python run_gaap.py --patch_low=40 --patch_high=43 --njobs=12 --hsc_type="S20A"
+# python run_gaap.py --patch_low=20 --patch_high=23 --njobs=6 --hsc_type="w_2022_40"

@@ -38,6 +38,11 @@ class GaapTask(object):
 
     def load_merian_reference(self, band='N540', repo='/projects/MERIAN/repo/',
                               collections='DECam/runs/merian/dr1_wide', range=None):
+        """
+        Here the range is to indicate the range of PARENTS! 
+        The children will be included automatically.
+
+        """
         self.merian_refBand = band
         self.merian = GaapTask(self.tract, self.patch, None,
                                band, repo, collections,
@@ -46,20 +51,40 @@ class GaapTask(object):
         self.merian.dataId = dict(tract=self.tract, patch=self.patch,
                                   band=band, skymap='hsc_rings_v1')
         self.refCat = self.merian.butler.get(
-            'deepCoadd_forced_src',
+            'deepCoadd_ref',
             collections=self.merian.collections,
             dataId=self.merian.dataId,
             instrument='DECam',
         )
         self.refCatInBand = self.merian.butler.get(
-            'deepCoadd_ref',
+            'deepCoadd_meas',
             collections='DECam/runs/merian/dr1_wide',
             dataId=self.merian.dataId,
             instrument='DECam',
         )
         if range is not None:
-            self.refCat = self.refCat[range[0]:range[1]]
-            self.refCatInBand = self.refCatInBand[range[0]:range[1]]
+            parents = np.arange(range[0], range[1], 1)
+            temp = self.refCat[parents[0]:parents[-1] + 1]
+            for parent in parents:
+                childrens = np.where(
+                    self.refCat['parent'] == self.refCat['id'][parent])[0]
+                temp.extend(self.refCat[childrens[0]:childrens[-1] + 1])
+            self.refCat = temp.copy()
+
+            temp = self.refCatInBand[parents[0]:parents[-1] + 1]
+            for parent in parents:
+                childrens = np.where(
+                    self.refCatInBand['parent'] == self.refCatInBand['id'][parent])[0]
+                temp.extend(self.refCatInBand[childrens[0]:childrens[-1] + 1])
+            self.refCatInBand = temp.copy()
+
+        self.footprintCatInBand = self.merian.butler.get(
+            'deepCoadd_scarletModelData',
+            collections='DECam/runs/merian/dr1_wide',
+            dataId=self.merian.dataId,
+            instrument='DECam',
+        )
+        # We use the scarlet model data to get the footprint
 
         self.refExposure = self.merian.butler.get(
             'deepCoadd_calexp',
@@ -99,8 +124,9 @@ class GaapTask(object):
 
     def setDefaultMeasureConfig(self):
         measureConfig = lsst.meas.base.ForcedPhotCoaddConfig()
-        measureConfig.footprintDatasetName = 'DeblendedFlux'
-        measureConfig.measurement.doReplaceWithNoise = False
+        measureConfig.footprintDatasetName = 'ScarletModelData'
+        # measureConfig.footprintDatasetName = 'DeblendedFlux'
+        # measureConfig.measurement.doReplaceWithNoise = False
 
         measureConfig.measurement.plugins.names.add("base_PsfFlux")
         measureConfig.measurement.plugins.names.add(
@@ -133,13 +159,14 @@ class GaapTask(object):
     def run(self):
         measureTask = lsst.meas.base.ForcedPhotCoaddTask(
             refSchema=self.refCat.schema, config=self.measureConfig)
+        self.setLogger(measureTask)
         measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.merian.butler.registry.expandDataId(self.merian.dataId),
                                                           exposure=self.exposure,
                                                           refCat=self.refCat,
                                                           refCatInBand=self.refCatInBand,
                                                           refWcs=self.refExposure.wcs,
                                                           idPackerName='tract_patch',
-                                                          footprintData=self.refCatInBand)
+                                                          footprintData=self.footprintCatInBand)
         self.measCat = measCat
         # return
         print("# Starting the GAaP measureTask at ", time.ctime())
