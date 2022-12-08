@@ -1,6 +1,6 @@
 import numpy as np
+from astropy.table import QTable, Table, hstack, vstack
 import lsst.pex.config
-
 import lsst.afw.table
 import lsst.meas.algorithms
 import lsst.pex.exceptions
@@ -22,41 +22,40 @@ merian_patches = [int(name) for name in os.listdir(
     "/projects/MERIAN/repo/DECam/runs/merian/dr1_wide/20220921T193246Z/deepCoadd_forced_src/9813")]
 common_patches = np.intersect1d(new_patches, merian_patches)
 
-from hsc_gaap.gaap import GaapTask, joinMerianCatPatches
+from hsc_gaap.gaap import GaapTask
 
 
-def runGaap(patch_filt, hsc_type='w_2022_40'):
+def runGaap(patch, bands='gri', hsc_type='w_2022_40'):
     try:
-        patch, filt = patch_filt
+        patch
         assert patch in common_patches, "Patch not in common patches"
-        print('### Processing patch', patch, 'band', filt)
+        print('### Processing patch =', patch, ', bands =', bands)
         if hsc_type == 'S20A':
-            gaap = GaapTask(9813, patch, filt, hsc_type='S20A',
+            gaap = GaapTask(9813, patch, bands, hsc_type='S20A',
                             repo='/projects/MERIAN/repo/',
                             collections='S20A/deepCoadd_calexp')
             gaap._checkHSCfile()
         elif hsc_type == 'w_2022_40':
-            gaap = GaapTask(9813, patch, filt, hsc_type='w_2022_40',
+            gaap = GaapTask(9813, patch, bands, hsc_type='w_2022_40',
                             repo='/projects/HSC/repo/main',
                             collections='HSC/runs/RC2/w_2022_40/DM-36151')
         elif hsc_type == 'w_2022_04':
-            gaap = GaapTask(9813, patch, filt, hsc_type='w_2022_04',
+            gaap = GaapTask(9813, patch, bands, hsc_type='w_2022_04',
                             repo='/projects/MERIAN/repo/',
                             collections='HSC/runs/RC2/w_2022_04/DM-33402')
 
         gaap.load_merian_reference(band='N708',
                                    repo='/projects/MERIAN/repo/',
                                    collections='DECam/runs/merian/dr1_wide',
+                                   range=(0, 100)
                                    )
         gaap.setDefaultMeasureConfig()
-        gaap.run()
-        cat2 = gaap.writeObjectTable(save=True)
-        # cat_ref = joinMerianCatPatches([patch])
-        # cat_ref = cat_ref[np.in1d(cat_ref['objectId'], cat2['id'])]
-        # cat2.remove_columns(['id', 'coord_ra', 'coord_dec'])
-        # cat = hstack([cat_ref, cat2])
-        # cat_ref.write(
-        #     f'/projects/MERIAN/repo/S20A/gaapTable/9813/{gaap.patch_old}/MerianTable_{gaap.band.upper()}_{gaap.tract}_{gaap.patch_old}.fits')
+        gaap.runAll()
+        gaap.writeObjectTable()
+        gaap.transformObjectCatalog(
+            functorFile='/home/jiaxuanl/Research/Merian/merian_tractor/scripts/hsc_gaap/Object.yaml')
+        gaap.saveObjectTable()
+
         del gaap
         gc.collect()
         print('\n')
@@ -65,7 +64,6 @@ def runGaap(patch_filt, hsc_type='w_2022_40'):
 
 
 def runGaapMultiJobs(patch_low, patch_high, bands='gri', njobs=4, hsc_type='w_2022_40'):
-    # common_patches[seed_low:seed_high]
     patches = np.arange(patch_low, patch_high + 1, 1)
     iterables = product(patches, list(bands))
     pool = mp.Pool(njobs)
@@ -88,9 +86,8 @@ def runGaapRowColumn(patch_cols, patch_rows, bands='grizy', njobs=4, hsc_type='S
     import itertools
     patches_old = list(itertools.product(patch_cols, patch_rows))
     patches = [item[0] + item[1] * 9 for item in patches_old]
-    iterables = product(patches, list(bands))
     pool = mp.Pool(njobs)
-    pool.map(partial(runGaap, hsc_type=hsc_type), iterables)
+    pool.map(partial(runGaap, bands=bands, hsc_type=hsc_type), patches)
     pool.close()
     pool.join()
 
@@ -98,18 +95,14 @@ def runGaapRowColumn(patch_cols, patch_rows, bands='grizy', njobs=4, hsc_type='S
 if __name__ == '__main__':
     fire.Fire(runGaapRowColumn)
 
-# python run_gaap.py --patch_low=22 --patch_high=25 --njobs=12 --hsc_type="S20A"
-# python run_gaap.py --patch_low=22 --patch_high=25 --njobs=12 --hsc_type="w_2022_40"
-
-# python run_gaap.py --patch_low=31 --patch_high=34 --njobs=12 --hsc_type="S20A"
-# python run_gaap.py --patch_low=40 --patch_high=43 --njobs=12 --hsc_type="S20A"
-
-
-# python run_gaap.py --patch_cols=[1] --patch_rows=[1] --njobs=1 --hsc_type="S20A"
 
 ########## S20A ##########
-# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[0,1] --njobs=9 --hsc_type="S20A"
-# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[2,3] --njobs=9 --hsc_type="S20A"
-# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[4,5] --njobs=9 --hsc_type="S20A"
-# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[6,7] --njobs=9 --hsc_type="S20A"
-# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[8] --njobs=9 --hsc_type="S20A"
+# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[0,1] --njobs=9 --hsc_type="S20A" # done in gaap1
+# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[2,3] --njobs=9 --hsc_type="S20A" # gaap2
+# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[4,5] --njobs=9 --hsc_type="S20A" # gaap3
+# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[6,7] --njobs=9 --hsc_type="S20A" # gaap4
+# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[8] --njobs=2 --hsc_type="S20A" # not done yet
+
+
+########## w_2022_40 ##########
+# python run_gaap.py --patch_cols=[3,4,5,6,7] --patch_rows=[2] --njobs=2 --hsc_type="w_2022_40" --bands='ri' # gaap_w40

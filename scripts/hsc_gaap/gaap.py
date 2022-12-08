@@ -58,42 +58,130 @@ import lsst.meas.base.peakLikelihoodFlux
 import lsst.meas.modelfit.cmodel.cmodel
 import lsst.meas.base.gaussianFlux
 
+# Write catalog
+from lsst.pipe.tasks.postprocess import WriteObjectTableTask, TransformObjectCatalogTask, TransformObjectCatalogConfig
+from lsst.pipe.tasks.parquetTable import MultilevelParquetTable
+from lsst.afw.table import SourceCatalog
+
 import lsst.daf.butler as dafButler
 import astropy.units as u
 from astropy.table import QTable, Table, hstack, vstack
 
 
 class GaapTask(object):
-    def __init__(self, tract, patch, band, hsc_type='S20A',
+    def __init__(self, tract, patch, bands, hsc_type='S20A',
                  repo='/projects/MERIAN/repo/', collections='S20A/deepCoadd_calexp',
                  is_merian=False, log_level='ERROR'):
+        """
+        Run GAaP on one patch of one tract of HSC data.
+
+        Parameters
+        ----------
+        tract : int.
+            Tract number. E.g., 9813 (COSMOS field).
+        patch : int.
+            Patch number. E.g., 23. There are 81 patches in a tract.
+        bands : list of str.
+            List of bands to run GAaP on. E.g., ``['g', 'r', 'i', 'z', 'y']`` or ``'grizy'``.
+        hsc_type : str, optional.
+            The version of HSC data. E.g., 'S20A' or 'w_2022_40'. The default is 'S20A'.
+        repo : str, optional.
+            The path to the data repo. The default is '/projects/MERIAN/repo/'.
+            If you use ``w_2022_40`` data, you need to specify the repo to be ``'/projects/HSC/repo/main'``.
+        collections : str, optional.
+            The collection of the data. The default is ``'S20A/deepCoadd_calexp'``.
+            If you use ``w_2022_40`` data, you need to specify the collection to be ``'HSC/runs/RC2/w_2022_40/DM-36151'``.
+        is_merian : bool, optional.
+            Whether the data is from MERIAN. The default is False.
+        log_level : str, optional.
+            The log level. The default is 'ERROR'.
+
+        """
         self.tract = tract
         self.patch = patch
-        self.band = band
+        self.bands = bands
         self.repo = repo
         self.collections = collections
         self.log_level = log_level
         self.patch_old = f'{self.patch % 9},{self.patch // 9}'
         if not is_merian:
             self.hsc_type = hsc_type
+            self.exposures = {}
             self._get_exposure()
+            self.forcedSrcCats = {}
+
+    def _get_exposure(self):
+        """
+        Load HSC exposures.
+        """
+        if self.hsc_type == 'S20A':
+            self._checkHSCfile()
+            for band in self.bands:
+                self.exposures[band] = lsst.afw.image.ExposureF(
+                    self.filenames[band])
+        elif self.hsc_type == 'w_2022_04':
+            assert self.hsc_type in self.collections, 'w04 data not in repo'
+            butler = dafButler.Butler(self.repo)
+            for band in self.bands:
+                dataId = dict(tract=self.tract, patch=self.patch, band=band)
+                self.exposures[band] = butler.get(
+                    'deepCoadd_calexp',
+                    collections=self.collections,
+                    dataId=dataId,
+                    instrument='HSC',
+                    skymap='hsc_rings_v1',
+                )
+        elif self.hsc_type == 'w_2022_40':
+            assert self.hsc_type in self.collections, 'w40 data not in repo'
+            butler = dafButler.Butler(self.repo)
+            for band in self.bands:
+                dataId = dict(tract=self.tract, patch=self.patch, band=band)
+                self.exposures[band] = butler.get(
+                    'deepCoadd_calexp',
+                    collections=self.collections,
+                    dataId=dataId,
+                    instrument='HSC',
+                    skymap='hsc_rings_v1',
+                )
+        print(
+            f'Loaded HSC {self.hsc_type} deepCoadd_calexp images in {self.bands} bands')
 
     def _checkHSCfile(self):
-        self.filename = os.path.join(self.repo, self.collections, str(self.tract), str(self.patch_old),
-                                     f'calexp-HSC-{self.band.upper()}-{self.tract}-{self.patch_old}.fits')
-        if not os.path.isfile(self.filename):
-            raise FileNotFoundError(f'File {self.filename} not found')
+        """
+        Check if HSC S20A data for the given tract and patch exist.
+        """
+        self.filenames = {}
+        for band in self.bands:
+            self.filenames[band] = os.path.join(self.repo, self.collections, str(self.tract), str(self.patch_old),
+                                                f'calexp-HSC-{band.upper()}-{self.tract}-{self.patch_old}.fits')
+            if not os.path.isfile(self.filenames[band]):
+                raise FileNotFoundError(
+                    f'File {self.filenames[band]} not found')
 
-    def load_merian_reference(self, band='N540', repo='/projects/MERIAN/repo/',
+    def load_merian_reference(self, band='N708', repo='/projects/MERIAN/repo/',
                               collections='DECam/runs/merian/dr1_wide', range=None):
         """
-        Here the range is to indicate the range of PARENTS! 
-        The children will be included automatically.
+        Load Merian data as reference for forced photometry. 
+        We use the scarlet footprint from Merian.
 
+        Parameters
+        ----------
+        band: str, optional.
+            The band of the reference catalog. The default is 'N708'.
+        repo: str, optional.
+            The path to the Merian repo. The default is '/projects/MERIAN/repo/'.
+        collections: str, optional.
+            The collection of the Merian data. The default is 'DECam/runs/merian/dr1_wide'.
+            You may change it if you want to use other Merian data release.
+        range: list of int, optional.
+            This is used to specify the range of PARENTS in the reference catalog.
+            In the debug mode, we only use a small range of PARENTS to save time.
+            The children of these parents will be included automatically.
+            In production mode, please set ``range=None``.
         """
         self.merian_refBand = band
         self.merian = GaapTask(self.tract, self.patch, None,
-                               band, repo, collections,
+                               [band], repo, collections,
                                is_merian=True)
         self.merian.butler = dafButler.Butler(repo)
         self.merian.dataId = dict(tract=self.tract, patch=self.patch,
@@ -143,40 +231,18 @@ class GaapTask(object):
 
         # There can be very small differences in the WCS, so we need to make sure they are the same
         # If they are the same, then we overwrite the WCS in the exposure with the reference WCS
-        if checkWcsEqual(self.exposure.getWcs(), self.refExposure.getWcs()):
-            self.exposure.setWcs(self.refExposure.getWcs())
+        for band in self.bands:
+            if checkWcsEqual(self.exposures[band].getWcs(), self.refExposure.getWcs()) and self.hsc_type == 'S20A':
+                self.exposures[band].setWcs(self.refExposure.getWcs())
 
         print('Loaded Merian reference catalog and image')
 
-    def _get_exposure(self):
-        if self.hsc_type == 'S20A':
-            self._checkHSCfile()
-            self.exposure = lsst.afw.image.ExposureF(self.filename)
-        elif self.hsc_type == 'w_2022_04':
-            assert self.hsc_type in self.collections, 'w04 data not in repo'
-            butler = dafButler.Butler(self.repo)
-            dataId = dict(tract=self.tract, patch=self.patch, band=self.band)
-            self.exposure = butler.get(
-                'deepCoadd_calexp',
-                collections=self.collections,
-                dataId=dataId,
-                instrument='HSC',
-                skymap='hsc_rings_v1',
-            )
-        elif self.hsc_type == 'w_2022_40':
-            assert self.hsc_type in self.collections, 'w40 data not in repo'
-            butler = dafButler.Butler(self.repo)
-            dataId = dict(tract=self.tract, patch=self.patch, band=self.band)
-            self.exposure = butler.get(
-                'deepCoadd_calexp',
-                collections=self.collections,
-                dataId=dataId,
-                instrument='HSC',
-                skymap='hsc_rings_v1',
-            )
-        print(f'Loaded HSC {self.hsc_type} deepCoadd_calexp image')
-
     def setDefaultMeasureConfig(self):
+        """
+        Set default measurement config for ``lsst.meas.base.ForcedPhotCoaddTask``.
+        For a complete list of the measurement plugins, please see
+        ``/projects/MERIAN/repo/DECam/runs/merian/dr1_wide/20220921T193246Z/forcedPhotCoadd_config``.
+        """
         measureConfig = lsst.meas.base.ForcedPhotCoaddConfig()
         measureConfig.footprintDatasetName = 'ScarletModelData'
         # measureConfig.footprintDatasetName = 'DeblendedFlux'
@@ -198,12 +264,13 @@ class GaapTask(object):
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doOptimalPhotometry = True
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].sigmas = [
             0.5, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.5, 2.0, 2.5, 3.5]
-        # measureConfig.measurement.plugins["ext_gaap_GaapFlux"].scalingFactors = [
-        #     1.5]
-        # [1.15, 1.25, 1.5]
         self.measureConfig = measureConfig
 
     def setLogger(self, task):
+        """
+        Set logger for ``lsst.meas.base.ForcedPhotCoaddTask``.
+        Typically used for debugging.
+        """
         import logging
         task.log.setLevel(self.log_level)
         if not task.log.hasHandlers():
@@ -213,114 +280,195 @@ class GaapTask(object):
             ch.setLevel(logging.DEBUG)
             task.log.addHandler(ch)
 
-    def run(self):
+    def runAll(self):
+        """
+        Run ``gaap`` photometry on all bands.
+        """
+        for band in self.bands:
+            self.run(band)
+
+    def run(self, band):
+        """
+        Run ``gaap`` photometry on a single band.
+        """
         measureTask = lsst.meas.base.ForcedPhotCoaddTask(
             refSchema=self.refCat.schema, config=self.measureConfig)
         self.setLogger(measureTask)
+
         measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.merian.butler.registry.expandDataId(self.merian.dataId),
-                                                          exposure=self.exposure,
+                                                          exposure=self.exposures[band],
                                                           refCat=self.refCat,
                                                           refCatInBand=self.refCatInBand,
                                                           refWcs=self.refExposure.wcs,
                                                           idPackerName='tract_patch',
                                                           footprintData=self.footprintCatInBand)
-        self.measCat = measCat
-        # return
-        print("# Starting the GAaP measureTask at ", time.ctime())
+        print(
+            f"# Starting the GAaP measureTask for {band}-band at", time.ctime())
         t1 = time.time()
         measureTask.run(measCat,
-                        self.exposure,
+                        self.exposures[band],
                         refCat=self.refCat,
                         refWcs=self.refExposure.wcs,
                         exposureId=exposureID)
         t2 = time.time()
         print("# Finished the GAaP measureTask in %.2f seconds." % (t2 - t1))
-        self.measCat = measCat
+        self.forcedSrcCats[band] = measCat
 
-    def writeObjectTable(self, save=True):
-        outCat = self.measCat.copy(deep=True).asAstropy()
-        outCat['coord_ra'] = outCat['coord_ra'].to(u.deg)
-        outCat['coord_dec'] = outCat['coord_dec'].to(u.deg)
-        rawCat = outCat.copy()  # First write a table with raw columns
+    # def writeObjectTable(self, save=True):
+    #     outCat = self.measCat.copy(deep=True).asAstropy()
+    #     outCat['coord_ra'] = outCat['coord_ra'].to(u.deg)
+    #     outCat['coord_dec'] = outCat['coord_dec'].to(u.deg)
+    #     rawCat = outCat.copy()  # First write a table with raw columns
 
-        old_gaap_cols = [
-            item for item in self.measCat.schema.getNames() if 'gaap' in item and 'apCorr' not in item]
-        old_gaap_cols += ['base_PsfFlux_instFlux',
-                          'base_PsfFlux_instFluxErr', 'base_PsfFlux_flag']
+    #     old_gaap_cols = [
+    #         item for item in self.measCat.schema.getNames() if 'gaap' in item and 'apCorr' not in item]
+    #     old_gaap_cols += ['base_PsfFlux_instFlux',
+    #                       'base_PsfFlux_instFluxErr', 'base_PsfFlux_flag']
 
-        outCat = outCat[['id', 'coord_ra', 'coord_dec'] + old_gaap_cols]
+    #     outCat = outCat[['id', 'coord_ra', 'coord_dec'] + old_gaap_cols]
 
-        # PhotCalib
-        for col in old_gaap_cols:
-            if 'instFlux' in col:
-                outCat[col] = outCat[col].value * \
-                    self.exposure.getPhotoCalib().instFluxToNanojansky(1) * u.nanomaggy
+    #     # PhotCalib
+    #     for col in old_gaap_cols:
+    #         if 'instFlux' in col:
+    #             outCat[col] = outCat[col].value * \
+    #                 self.exposure.getPhotoCalib().instFluxToNanojansky(1) * u.nanomaggy
 
-        new_gaap_cols = []
-        for col in old_gaap_cols:
-            name = col.replace('base', f'{self.band}')
-            name = name.replace('ext_gaap_GaapFlux', f'{self.band}_gaap')
-            name = name.replace('_instFlux', 'Flux').replace('PsfFlux', 'Psf')
-            if 'Flux' in name:
-                aper = name.split(
-                    "x_")[-1].replace('FluxErr', '').replace('Flux', '')
-                name = name.replace('_1_15x', '')
-                name = name.replace('_' + aper, aper.replace('_', 'p'))
+    #     new_gaap_cols = []
+    #     for col in old_gaap_cols:
+    #         name = col.replace('base', f'{self.band}')
+    #         name = name.replace('ext_gaap_GaapFlux', f'{self.band}_gaap')
+    #         name = name.replace('_instFlux', 'Flux').replace('PsfFlux', 'Psf')
+    #         if 'Flux' in name:
+    #             aper = name.split(
+    #                 "x_")[-1].replace('FluxErr', '').replace('Flux', '')
+    #             name = name.replace('_1_15x', '')
+    #             name = name.replace('_' + aper, aper.replace('_', 'p'))
 
-            if 'flag' in name:
-                aper = name.split(
-                    "x_")[-1].replace('_flag_bigPsf', '').replace('_flag', '')
-                name = name.replace('_1_15x', '')
-                if not 'gauss' in name:
-                    name = name.replace(
-                        '_' + aper, aper.replace('_', 'p') + 'Flux')
-            new_gaap_cols.append(name)
+    #         if 'flag' in name:
+    #             aper = name.split(
+    #                 "x_")[-1].replace('_flag_bigPsf', '').replace('_flag', '')
+    #             name = name.replace('_1_15x', '')
+    #             if not 'gauss' in name:
+    #                 name = name.replace(
+    #                     '_' + aper, aper.replace('_', 'p') + 'Flux')
+    #         new_gaap_cols.append(name)
 
-        outCat.rename_columns(old_gaap_cols, new_gaap_cols)
+    #     outCat.rename_columns(old_gaap_cols, new_gaap_cols)
+    #     self.outCatDir = os.path.join('/projects/MERIAN/repo/', 'S20A', 'gaapTable',
+    #                                   str(self.tract), str(
+    #                                       self.patch_old))
+    #     self.outCatFileName = os.path.join(self.outCatDir,
+    #                                        f'gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}_{self.hsc_type}.fits')
+    #     self.outCat = QTable(outCat)
+
+    #     if save:
+    #         if not os.path.isdir(self.outCatDir):
+    #             os.makedirs(self.outCatDir)
+    #         self.outCat.write(self.outCatFileName, overwrite=True)
+    #         print('Wrote GAaP table to', self.outCatFileName)
+    #         rawCat.write(os.path.join(self.outCatDir,
+    #                                   f'_raw_gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}_{self.hsc_type}.fits'))
+    #     return self.outCat
+
+    def writeObjectTable(self):
+        """
+        This step turns the ``measCat`` (which is effectively ``deepCoadd_forced_src``) into a ``deepCoadd_obj`` table, 
+        where measurements of all filters are merged into one table. It returns a ``pandas.DataFrame``.
+
+        References
+        ----------
+        https://github.com/lsst/pipe_tasks/blob/eee7ff78d7d7b7bcbdcc59fce9cbef2d184e5a8c/python/lsst/pipe/tasks/postprocess.py
+        """
+        writeTask = WriteObjectTableTask()
+        catalogs = {}
+        for band in self.bands:
+            catalogs[band] = {'forced_src': self.forcedSrcCats[band],
+                              'ref': SourceCatalog(),  # empty
+                              'meas': SourceCatalog()  # empty
+                              }
+        self.deepCoadd_obj = writeTask.run(catalogs, self.tract, self.patch)
+
+    def transformObjectCatalog(self, functorFile=None):
+        """
+        Produce a flattened Object Table, in the same format of ``lsstpipe`` output ``objectTable``.
+        The mapping between ``deepCoadd_obj`` and ``objectTable`` is specified in a functor file.
+        The default functor file is ``'$PIPE_TASKS_DIR/schemas/Object.yaml'``. However, it doesn't
+        contain customized ``gaap`` apertures. So I modified the original functor file and put it in
+        ``scripts/hsc_gaap/Object.yaml``.
+
+        Parameters
+        ----------
+        functorFile : str.
+            If not specified, use the default functor file.
+
+        References
+        ----------
+        https://github.com/lsst/pipe_tasks/blob/eee7ff78d7d7b7bcbdcc59fce9cbef2d184e5a8c/python/lsst/pipe/tasks/postprocess.py
+        """
+        parq = MultilevelParquetTable(dataFrame=self.deepCoadd_obj)
+        transConfig = TransformObjectCatalogConfig()
+        if functorFile is not None:
+            transConfig.functorFile = functorFile
+        transTask = TransformObjectCatalogTask(config=transConfig)
+        self.objectTable = transTask.run(parq)
+
+    def saveObjectTable(self):
+        """
+        Save the ``objectTable`` to a parquet file.
+
+        Parameters
+        ----------
+        fileName : str
+            If not specified, use the default file name.
+        """
+        self.outCat = Table.from_pandas(self.objectTable, index='objectId')
         self.outCatDir = os.path.join('/projects/MERIAN/repo/', 'S20A', 'gaapTable',
                                       str(self.tract), str(
                                           self.patch_old))
         self.outCatFileName = os.path.join(self.outCatDir,
-                                           f'gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}_{self.hsc_type}.fits')
-        self.outCat = QTable(outCat)
-
-        if save:
-            if not os.path.isdir(self.outCatDir):
-                os.makedirs(self.outCatDir)
-            self.outCat.write(self.outCatFileName, overwrite=True)
-            print('Wrote GAaP table to', self.outCatFileName)
-            rawCat.write(os.path.join(self.outCatDir,
-                                      f'_raw_gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}_{self.hsc_type}.fits'))
-        return self.outCat
+                                           f'objectTable_{self.tract}_{self.patch_old}_{self.hsc_type}.fits')
+        self.outCat = QTable(self.outCat)
+        if not os.path.isdir(self.outCatDir):
+            os.makedirs(self.outCatDir)
+        self.outCat.write(self.outCatFileName, overwrite=True)
+        print('Wrote GAaP table to', self.outCatFileName)
 
 
-def joinCatBands(patch=23, filters='griz', tract=9813, hsc_type='w_2022_40'):
+def consolidateObjectTables(patches, tract=9813, hsc_type='S20A'):
     """
-    Merge catalogs in multiple bands
-    """
-    cats = []
-    patch_old = f'{patch % 9},{patch // 9}'
-    for i, filt in enumerate(list(filters)):
-        temp = Table.read(
-            f'/projects/MERIAN/repo/S20A/gaapTable/{tract}/{patch_old}/gaapTable_{filt.upper()}_{tract}_{patch_old}_{hsc_type}.fits')
-        if i > 0:
-            temp.remove_columns(['id', 'coord_ra', 'coord_dec'])
-        cats.append(temp)
-    return hstack(cats)
+    Concatenate catalogs in multiple patches.
 
-
-def joinCatPatches(patches, filters='griz', tract=9813, hsc_type='w_2022_40'):
-    """
-    Concatenate catalogs in multiple patches
+    Parameters
+    ----------
+    patches : list of int.
+        List of patches, in modern format.
+    tract : int.
+        Tract number.
+    hsc_type : str.
+        The version of HSC data. E.g., ``S20A`` or ``w_2020_40``.
     """
     cats = []
-    for i in patches:
-        cats.append(joinCatBands(patch=i, filters=filters,
-                    tract=tract, hsc_type=hsc_type))
+    for patch in patches:
+        patch_old = f'{patch % 9},{patch // 9}'
+        outCatDir = os.path.join('/projects/MERIAN/repo/', 'S20A', 'gaapTable',
+                                 str(tract), str(patch_old))
+        outCatFileName = os.path.join(outCatDir,
+                                      f'objectTable_{tract}_{patch_old}_{hsc_type}.fits')
+        cats.append(Table.read(outCatFileName))
     return vstack(cats)
 
 
-def joinMerianCatPatches(patches, tract=9813):
+def consolidateMerianCats(patches, tract=9813, collections='DECam/runs/merian/dr1_wide'):
+    """
+    Concatenate Merian catalogs in multiple patches.
+
+    Parameters
+    ----------
+    patches : list of int.
+        List of patches, in modern format.
+    tract : int.
+        Tract number.
+    """
     import lsst.daf.butler as dafButler
     butler = dafButler.Butler('/projects/MERIAN/repo/')
 
@@ -330,7 +478,7 @@ def joinMerianCatPatches(patches, tract=9813):
         dataId = dict(tract=tract, patch=patch)
         refCat = butler.get(
             'objectTable',
-            collections='DECam/runs/merian/dr1_wide',
+            collections=collections,
             dataId=dataId,
             instrument='DECam',
             skymap='hsc_rings_v1',
@@ -341,12 +489,16 @@ def joinMerianCatPatches(patches, tract=9813):
 
 
 def checkWcsEqual(wcs1, wcs2):
+    """
+    Check whether two WCS are equal (within some tolerance).
+
+    Parameters
+    ----------
+    wcs1, wcs2 : `lsst.afw.geom.SkyWcs`.
+    """
     # Check origin pixel
     d = wcs1.getPixelOrigin() - wcs2.getPixelOrigin()
-    flag = (np.abs(d.x) < 1e-5) & (np.abs(d.y) < 1e-5)
+    flag = (np.abs(d.x) < 1e-6) & (np.abs(d.y) < 1e-6)
+    # Check transfom matrix
     flag &= np.all(np.abs(wcs1.getCdMatrix() - wcs2.getCdMatrix()) < 1e-8)
     return flag
-
-
-def transformObjectCatalog():
-    pass
