@@ -46,8 +46,7 @@ def runGaap(patch, bands='gri', hsc_type='w_2022_40'):
 
         gaap.load_merian_reference(band='N708',
                                    repo='/projects/MERIAN/repo/',
-                                   collections='DECam/runs/merian/dr1_wide',
-                                   range=(0, 100)
+                                   collections='DECam/runs/merian/dr1_wide'
                                    )
         gaap.setDefaultMeasureConfig()
         gaap.runAll()
@@ -97,10 +96,10 @@ if __name__ == '__main__':
 
 
 ########## S20A ##########
-# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[0,1] --njobs=9 --hsc_type="S20A" # done in gaap1
-# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[2,3] --njobs=9 --hsc_type="S20A" # gaap2
-# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[4,5] --njobs=9 --hsc_type="S20A" # gaap3
-# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[6,7] --njobs=9 --hsc_type="S20A" # gaap4
+# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[0,1] --njobs=6 --hsc_type="S20A" # done in gaap1
+# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[2,3] --njobs=6 --hsc_type="S20A" # gaap2
+# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[4,5] --njobs=6 --hsc_type="S20A" # gaap3
+# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[6,7] --njobs=6 --hsc_type="S20A" # gaap4
 # python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[8] --njobs=2 --hsc_type="S20A" # not done yet
 
 
