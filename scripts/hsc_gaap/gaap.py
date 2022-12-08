@@ -10,6 +10,54 @@ import lsst.meas.algorithms
 import lsst.meas.deblender
 import lsst.pex.exceptions
 import lsst.meas.extensions.gaap
+
+import lsst.meas.modelfit.psf.psfContinued
+import lsst.meas.modelfit.optimizer.optimizer
+import lsst.meas.modelfit
+import lsst.meas.modelfit.cmodel.cmodelContinued
+import lsst.meas.modelfit.pixelFitRegion.pixelFitRegion
+import lsst.meas.modelfit.cmodel.cmodel
+
+import lsst.meas.base.forcedPhotCoadd
+import lsst.meas.base.catalogCalculation
+import lsst.meas.base.scaledApertureFlux
+import lsst.meas.base.sdssShape
+import lsst.ip.diffim.psfMatch
+import lsst.meas.base.psfFlux
+import lsst.meas.algorithms.subtractBackground
+import lsst.meas.modelfit.psf.psfContinued
+import lsst.meas.base.applyApCorr
+import lsst.meas.base.noiseReplacer
+import lsst.meas.base.blendedness
+import lsst.meas.extensions.convolved.convolved
+import lsst.meas.base.baseMeasurement
+import lsst.meas.extensions.shapeHSM.hsmShapeControl
+import lsst.meas.modelfit.optimizer.optimizer
+import lsst.meas.modelfit
+import lsst.afw.math._warper
+import lsst.meas.base.forcedMeasurement
+import lsst.meas.modelfit.cmodel.cmodelContinued
+import lsst.ip.diffim._dipoleAlgorithms
+import lsst.meas.base.footprintArea
+import lsst.meas.modelfit.priors.priors
+import lsst.meas.base.classification
+import lsst.meas.modelfit.pixelFitRegion.pixelFitRegion
+import lsst.meas.base.localBackground
+import lsst.meas.base.wrappers
+import lsst.meas.extensions.photometryKron.photometryKron
+import lsst.meas.base.pixelFlags
+import lsst.pipe.base.config
+import lsst.meas.extensions.gaap._gaap
+import lsst.meas.extensions.gaap._gaussianizePsf
+import lsst.meas.extensions.shapeHSM.hsmMomentsControl
+import lsst.meas.base.plugins
+import lsst.meas.base.apertureFlux
+import lsst.meas.base.naiveCentroid
+import lsst.meas.base.sdssCentroid
+import lsst.meas.base.peakLikelihoodFlux
+import lsst.meas.modelfit.cmodel.cmodel
+import lsst.meas.base.gaussianFlux
+
 import lsst.daf.butler as dafButler
 import astropy.units as u
 from astropy.table import QTable, Table, hstack, vstack
@@ -78,13 +126,13 @@ class GaapTask(object):
                 temp.extend(self.refCatInBand[childrens[0]:childrens[-1] + 1])
             self.refCatInBand = temp.copy()
 
+        # We use the scarlet model data to get the footprint
         self.footprintCatInBand = self.merian.butler.get(
             'deepCoadd_scarletModelData',
             collections='DECam/runs/merian/dr1_wide',
             dataId=self.merian.dataId,
             instrument='DECam',
         )
-        # We use the scarlet model data to get the footprint
 
         self.refExposure = self.merian.butler.get(
             'deepCoadd_calexp',
@@ -92,6 +140,12 @@ class GaapTask(object):
             dataId=self.merian.dataId,
             instrument='DECam',
         )
+
+        # There can be very small differences in the WCS, so we need to make sure they are the same
+        # If they are the same, then we overwrite the WCS in the exposure with the reference WCS
+        if checkWcsEqual(self.exposure.getWcs(), self.refExposure.getWcs()):
+            self.exposure.setWcs(self.refExposure.getWcs())
+
         print('Loaded Merian reference catalog and image')
 
     def _get_exposure(self):
@@ -133,14 +187,17 @@ class GaapTask(object):
             "base_CircularApertureFlux")
         measureConfig.measurement.plugins.names.add("base_SdssShape")
         measureConfig.measurement.plugins.names.add("base_SdssCentroid")
-        # measureConfig.measurement.plugins.names.add('base_Blendedness')
+        measureConfig.measurement.plugins.names.add("base_Blendedness")
+        measureConfig.measurement.plugins.names.add(
+            'modelfit_DoubleShapeletPsfApprox')
+        measureConfig.measurement.plugins.names.add('modelfit_CModel')
 
         measureConfig.measurement.plugins.names.add("ext_gaap_GaapFlux")
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doMeasure = True
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doPsfPhotometry = True
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doOptimalPhotometry = True
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].sigmas = [
-            0.4, 0.5, 0.6, 0.7, 1.0, 1.5, 2.0]
+            0.5, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.5, 2.0, 2.5, 3.5]
         # measureConfig.measurement.plugins["ext_gaap_GaapFlux"].scalingFactors = [
         #     1.5]
         # [1.15, 1.25, 1.5]
@@ -184,13 +241,12 @@ class GaapTask(object):
         outCat = self.measCat.copy(deep=True).asAstropy()
         outCat['coord_ra'] = outCat['coord_ra'].to(u.deg)
         outCat['coord_dec'] = outCat['coord_dec'].to(u.deg)
+        rawCat = outCat.copy()  # First write a table with raw columns
 
         old_gaap_cols = [
             item for item in self.measCat.schema.getNames() if 'gaap' in item and 'apCorr' not in item]
         old_gaap_cols += ['base_PsfFlux_instFlux',
                           'base_PsfFlux_instFluxErr', 'base_PsfFlux_flag']
-        # old_gaap_cols += ['base_Blendedness_abs',
-        #                   'base_Blendedness_old', 'base_Blendedness_flag']
 
         outCat = outCat[['id', 'coord_ra', 'coord_dec'] + old_gaap_cols]
 
@@ -233,6 +289,8 @@ class GaapTask(object):
                 os.makedirs(self.outCatDir)
             self.outCat.write(self.outCatFileName, overwrite=True)
             print('Wrote GAaP table to', self.outCatFileName)
+            rawCat.write(os.path.join(self.outCatDir,
+                                      f'_raw_gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}_{self.hsc_type}.fits'))
         return self.outCat
 
 
@@ -280,3 +338,15 @@ def joinMerianCatPatches(patches, tract=9813):
         refCat = Table.from_pandas(refCat, index=True)
         cats.append(refCat)
     return vstack(cats)
+
+
+def checkWcsEqual(wcs1, wcs2):
+    # Check origin pixel
+    d = wcs1.getPixelOrigin() - wcs2.getPixelOrigin()
+    flag = (np.abs(d.x) < 1e-5) & (np.abs(d.y) < 1e-5)
+    flag &= np.all(np.abs(wcs1.getCdMatrix() - wcs2.getCdMatrix()) < 1e-8)
+    return flag
+
+
+def transformObjectCatalog():
+    pass
