@@ -71,7 +71,7 @@ from astropy.table import QTable, Table, vstack
 class GaapTask(object):
     def __init__(self, tract, patch, bands, hsc_type='S20A',
                  repo='/projects/MERIAN/repo/', collections='S20A/deepCoadd_calexp',
-                 is_merian=False, log_level='ERROR', logger=None):
+                 is_merian=False, logger=None, log_level='INFO'):
         """
         Run GAaP on one patch of one tract of HSC data.
 
@@ -93,10 +93,10 @@ class GaapTask(object):
             If you use ``w_2022_40`` data, you need to specify the collection to be ``'HSC/runs/RC2/w_2022_40/DM-36151'``.
         is_merian : bool, optional.
             Whether the data is from MERIAN. The default is False.
-        log_level : str, optional.
-            The log level. The default is 'ERROR'.
         logger : logging.Logger, optional.
             External logger other than the LSSTpipe logger. The default is None.
+        log_level : str, optional.
+            The log level. The default is ``'ERROR'``.
         """
         self.tract = tract
         self.patch = patch
@@ -106,6 +106,10 @@ class GaapTask(object):
         self.log_level = log_level
         self.patch_old = f'{self.patch % 9},{self.patch // 9}'
         self.logger = logger
+
+        if self.logger is not None:
+            logger.setLevel(self.log_level)
+
         if not is_merian:
             self.hsc_type = hsc_type
             self.exposures = {}
@@ -145,8 +149,9 @@ class GaapTask(object):
                     instrument='HSC',
                     skymap='hsc_rings_v1',
                 )
-        print(
-            f'Loaded HSC {self.hsc_type} deepCoadd_calexp images in {self.bands} bands')
+        if self.logger is not None:
+            self.logger.info(
+                'Loaded HSC {} deepCoadd_calexp images in {} bands'.format(self.hsc_type, self.bands))
 
     def _checkHSCfile(self):
         """
@@ -243,7 +248,9 @@ class GaapTask(object):
             if checkWcsEqual(self.exposures[band].getWcs(), self.refExposure.getWcs()) and self.hsc_type == 'S20A':
                 self.exposures[band].setWcs(self.refExposure.getWcs())
 
-        print('Loaded Merian reference catalog and image')
+        if self.logger is not None:
+            self.logger.info(
+                f'Loaded Merian reference catalog and image in {self.merian_refBand} band')
 
     def setDefaultMeasureConfig(self):
         """
@@ -288,12 +295,25 @@ class GaapTask(object):
             ch.setLevel(logging.DEBUG)
             task.log.addHandler(ch)
 
-    def runAll(self):
+    def runAll(self, pool=None):
         """
         Run ``gaap`` photometry on all bands.
+
+        Parameters
+        ----------
+        pool : multiprocessing.Pool, optional.
+            The multiprocessing pool to parallelize the measurements on different bands.
         """
-        for band in self.bands:
-            self.run(band)
+        if pool is not None:
+            if self.logger is not None:
+                self.logger.info(
+                    'Running ForcedPhotCoaddTask on all bands using multiprocessing')
+            pool.map(self.run, self.bands)
+            pool.close()
+            pool.join()
+        else:
+            for band in self.bands:
+                self.run(band)
 
     def run(self, band):
         """
@@ -308,7 +328,7 @@ class GaapTask(object):
             logger = measureTask.log
 
         logger.info(
-            '    - Running ForcedPhotCoaddTask on %s band' % band)
+            f'    - Patch {self.patch}: Running ForcedPhotCoaddTask on {band} band')
         measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.merian.butler.registry.expandDataId(self.merian.dataId),
                                                           exposure=self.exposures[band],
                                                           refCat=self.refCat,
@@ -317,7 +337,7 @@ class GaapTask(object):
                                                           idPackerName='tract_patch',
                                                           footprintData=self.footprintCatInBand)
         print(
-            f"# Starting the GAaP measureTask for {band}-band at", time.ctime())
+            f"# Starting the GAaP measureTask for patch={self.patch}, band={band} at", time.ctime())
         t1 = time.time()
         measureTask.run(measCat,
                         self.exposures[band],
@@ -326,7 +346,7 @@ class GaapTask(object):
                         exposureId=exposureID)
         t2 = time.time()
         logger.info(
-            '    - Finished ForcedPhotCoaddTask in %.2f seconds' % (t2 - t1))
+            '    - Patch {self.patch}: Finished ForcedPhotCoaddTask in %.2f seconds' % (t2 - t1))
         print("# Finished the GAaP measureTask in %.2f seconds." % (t2 - t1))
         self.forcedSrcCats[band] = measCat
 
@@ -347,6 +367,9 @@ class GaapTask(object):
                               'meas': SourceCatalog()  # empty
                               }
         self.deepCoadd_obj = writeTask.run(catalogs, self.tract, self.patch)
+        if self.logger is not None:
+            self.logger.info(
+                f'    - Patch {self.patch}: Finished WriteObjectTableTask')
 
     def transformObjectCatalog(self, functorFile=None):
         """
@@ -378,6 +401,10 @@ class GaapTask(object):
             transTask.funcs.log.setLevel('FATAL')
             self.objectTable = transTask.run(parq)
 
+        if self.logger is not None:
+            self.logger.info(
+                f'    - Patch {self.patch}: Finished TransformObjectCatalogTask')
+
     def saveObjectTable(self):
         """
         Save the ``objectTable`` to a parquet file.
@@ -399,7 +426,7 @@ class GaapTask(object):
         self.outCat.write(self.outCatFileName, overwrite=True)
         if self.logger is not None:
             self.logger.info(
-                'Wrote GAaP table to {}'.format(self.outCatFileName))
+                f'Patch {self.patch}: Wrote GAaP table to {self.outCatFileName}')
         print('Wrote GAaP table to', self.outCatFileName)
 
 
@@ -471,3 +498,15 @@ def checkWcsEqual(wcs1, wcs2):
     # Check transfom matrix
     flag &= np.all(np.abs(wcs1.getCdMatrix() - wcs2.getCdMatrix()) < 1e-8)
     return flag
+
+
+def NaiveLogger(filename):
+    import logging
+    logging.basicConfig(filename=filename,
+                        filemode='a',
+                        format='%(asctime)s, %(name)s: %(levelname)s %(message)s',
+                        datefmt='%H:%M:%S',
+                        level=logging.INFO)
+    logger = logging.getLogger('GaapMaster')
+
+    return logger
