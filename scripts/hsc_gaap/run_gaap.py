@@ -39,24 +39,28 @@ def setLogger(filename):
 
 def runGaap(patch, bands='gri', hsc_type='w_2022_40', logger=None):
     try:
-        assert patch in common_patches, "Patch not in common patches"
+        if patch not in common_patches:
+            if logger is not None:
+                logger.error(f'Patch {patch} not in common patches')
+
         if logger is not None:
             logger.info('\n')
             logger.info(f'### Processing patch = {patch}, bands = {bands}')
         print('### Processing patch =', patch, ', bands =', bands)
+
         if hsc_type == 'S20A':
             gaap = GaapTask(9813, patch, bands, hsc_type='S20A',
                             repo='/projects/MERIAN/repo/',
-                            collections='S20A/deepCoadd_calexp')
+                            collections='S20A/deepCoadd_calexp', logger=logger)
             gaap._checkHSCfile()
         elif hsc_type == 'w_2022_40':
             gaap = GaapTask(9813, patch, bands, hsc_type='w_2022_40',
                             repo='/projects/HSC/repo/main',
-                            collections='HSC/runs/RC2/w_2022_40/DM-36151')
+                            collections='HSC/runs/RC2/w_2022_40/DM-36151', logger=logger)
         elif hsc_type == 'w_2022_04':
             gaap = GaapTask(9813, patch, bands, hsc_type='w_2022_04',
                             repo='/projects/MERIAN/repo/',
-                            collections='HSC/runs/RC2/w_2022_04/DM-33402')
+                            collections='HSC/runs/RC2/w_2022_04/DM-33402', logger=logger)
 
         gaap.load_merian_reference(band='N708',
                                    repo='/projects/MERIAN/repo/',
@@ -78,28 +82,21 @@ def runGaap(patch, bands='gri', hsc_type='w_2022_40', logger=None):
         print(e)
 
 
-def runGaapMultiJobs(patch_low, patch_high, bands='gri', njobs=4, hsc_type='w_2022_40'):
-    patches = np.arange(patch_low, patch_high + 1, 1)
-    iterables = product(patches, list(bands))
-    pool = mp.Pool(njobs)
-    pool.map(partial(runGaap, hsc_type=hsc_type), iterables)
-    pool.close()
-    pool.join()
-
-
 def runGaapRowColumn(patch_cols, patch_rows, bands='grizy', njobs=4, hsc_type='S20A'):
     """
     Parameters
     ----------
     patch_cols : list. 
         The column numbers of the patches to be processed, following the old patch pattern.
-        patch_new = int(patch_old[0]) + int(patch_old[2]) * 9
+        ``patch_new = int(patch_old[0]) + int(patch_old[2]) * 9``
     patch_rows : list.
         The row numbers of the patches to be processed, following the old patch pattern.
 
     """
     import itertools
-    logger = setLogger(f'gaap_{patch_rows}.log')
+    if os.isdir('./log') is False:
+        os.mkdir('./log')
+    logger = setLogger(f'./log/gaap_{patch_rows}.log')
     patches_old = list(itertools.product(patch_cols, patch_rows))
     patches = [item[0] + item[1] * 9 for item in patches_old]
     pool = mp.Pool(njobs)
@@ -120,10 +117,8 @@ if __name__ == '__main__':
 # nice -n 10 python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[6,7] --njobs=6 --hsc_type="S20A" # gaap4
 # nice -n 10 python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[8] --njobs=2 --hsc_type="S20A" # gaap5
 
-
 ########## w_2022_40 ##########
 # python run_gaap.py --patch_cols=[3,4,5,6,7] --patch_rows=[2] --njobs=2 --hsc_type="w_2022_40" --bands='ri' # gaap_w40
 
-
-# test
+########## test ##########
 # python run_gaap.py --patch_cols=[0] --patch_rows=[0,1] --njobs=2 --hsc_type="S20A" # done in gaap1

@@ -65,13 +65,13 @@ from lsst.afw.table import SourceCatalog
 
 import lsst.daf.butler as dafButler
 import astropy.units as u
-from astropy.table import QTable, Table, hstack, vstack
+from astropy.table import QTable, Table, vstack
 
 
 class GaapTask(object):
     def __init__(self, tract, patch, bands, hsc_type='S20A',
                  repo='/projects/MERIAN/repo/', collections='S20A/deepCoadd_calexp',
-                 is_merian=False, log_level='ERROR'):
+                 is_merian=False, log_level='ERROR', logger=None):
         """
         Run GAaP on one patch of one tract of HSC data.
 
@@ -95,7 +95,8 @@ class GaapTask(object):
             Whether the data is from MERIAN. The default is False.
         log_level : str, optional.
             The log level. The default is 'ERROR'.
-
+        logger : logging.Logger, optional.
+            External logger other than the LSSTpipe logger. The default is None.
         """
         self.tract = tract
         self.patch = patch
@@ -104,6 +105,7 @@ class GaapTask(object):
         self.collections = collections
         self.log_level = log_level
         self.patch_old = f'{self.patch % 9},{self.patch // 9}'
+        self.logger = logger
         if not is_merian:
             self.hsc_type = hsc_type
             self.exposures = {}
@@ -300,7 +302,12 @@ class GaapTask(object):
         measureTask = lsst.meas.base.ForcedPhotCoaddTask(
             refSchema=self.refCat.schema, config=self.measureConfig)
         self.setLogger(measureTask)
-        measureTask.log.info(
+        if self.logger is not None:
+            logger = self.logger
+        else:
+            logger = measureTask.log
+
+        logger.info(
             '    - Running ForcedPhotCoaddTask on %s band' % band)
         measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.merian.butler.registry.expandDataId(self.merian.dataId),
                                                           exposure=self.exposures[band],
@@ -318,66 +325,10 @@ class GaapTask(object):
                         refWcs=self.refExposure.wcs,
                         exposureId=exposureID)
         t2 = time.time()
-        measureTask.log.info(
+        logger.info(
             '    - Finished ForcedPhotCoaddTask in %.2f seconds' % (t2 - t1))
         print("# Finished the GAaP measureTask in %.2f seconds." % (t2 - t1))
         self.forcedSrcCats[band] = measCat
-
-    # def writeObjectTable(self, save=True):
-    #     outCat = self.measCat.copy(deep=True).asAstropy()
-    #     outCat['coord_ra'] = outCat['coord_ra'].to(u.deg)
-    #     outCat['coord_dec'] = outCat['coord_dec'].to(u.deg)
-    #     rawCat = outCat.copy()  # First write a table with raw columns
-
-    #     old_gaap_cols = [
-    #         item for item in self.measCat.schema.getNames() if 'gaap' in item and 'apCorr' not in item]
-    #     old_gaap_cols += ['base_PsfFlux_instFlux',
-    #                       'base_PsfFlux_instFluxErr', 'base_PsfFlux_flag']
-
-    #     outCat = outCat[['id', 'coord_ra', 'coord_dec'] + old_gaap_cols]
-
-    #     # PhotCalib
-    #     for col in old_gaap_cols:
-    #         if 'instFlux' in col:
-    #             outCat[col] = outCat[col].value * \
-    #                 self.exposure.getPhotoCalib().instFluxToNanojansky(1) * u.nanomaggy
-
-    #     new_gaap_cols = []
-    #     for col in old_gaap_cols:
-    #         name = col.replace('base', f'{self.band}')
-    #         name = name.replace('ext_gaap_GaapFlux', f'{self.band}_gaap')
-    #         name = name.replace('_instFlux', 'Flux').replace('PsfFlux', 'Psf')
-    #         if 'Flux' in name:
-    #             aper = name.split(
-    #                 "x_")[-1].replace('FluxErr', '').replace('Flux', '')
-    #             name = name.replace('_1_15x', '')
-    #             name = name.replace('_' + aper, aper.replace('_', 'p'))
-
-    #         if 'flag' in name:
-    #             aper = name.split(
-    #                 "x_")[-1].replace('_flag_bigPsf', '').replace('_flag', '')
-    #             name = name.replace('_1_15x', '')
-    #             if not 'gauss' in name:
-    #                 name = name.replace(
-    #                     '_' + aper, aper.replace('_', 'p') + 'Flux')
-    #         new_gaap_cols.append(name)
-
-    #     outCat.rename_columns(old_gaap_cols, new_gaap_cols)
-    #     self.outCatDir = os.path.join('/projects/MERIAN/repo/', 'S20A', 'gaapTable',
-    #                                   str(self.tract), str(
-    #                                       self.patch_old))
-    #     self.outCatFileName = os.path.join(self.outCatDir,
-    #                                        f'gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}_{self.hsc_type}.fits')
-    #     self.outCat = QTable(outCat)
-
-    #     if save:
-    #         if not os.path.isdir(self.outCatDir):
-    #             os.makedirs(self.outCatDir)
-    #         self.outCat.write(self.outCatFileName, overwrite=True)
-    #         print('Wrote GAaP table to', self.outCatFileName)
-    #         rawCat.write(os.path.join(self.outCatDir,
-    #                                   f'_raw_gaapTable_{self.band.upper()}_{self.tract}_{self.patch_old}_{self.hsc_type}.fits'))
-    #     return self.outCat
 
     def writeObjectTable(self):
         """
@@ -446,6 +397,9 @@ class GaapTask(object):
         if not os.path.isdir(self.outCatDir):
             os.makedirs(self.outCatDir)
         self.outCat.write(self.outCatFileName, overwrite=True)
+        if self.logger is not None:
+            self.logger.info(
+                'Wrote GAaP table to {}'.format(self.outCatFileName))
         print('Wrote GAaP table to', self.outCatFileName)
 
 
