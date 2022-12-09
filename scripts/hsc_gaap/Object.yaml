@@ -12,12 +12,12 @@ funcs:
     coord_ra:
         # reference position for merged "ref" cat. Required by db. Not in DPDD
         functor: RAColumn
-        dataset: ref
+        dataset: forced_src
     coord_dec:
         # reference position for merged "ref" cat. Required by db. Not in DPDD
         # coord_dec because "dec" is reserved in most SQL DBs
         functor: DecColumn
-        dataset: ref
+        dataset: forced_src
     ra:
         functor: CoordColumn
         args: coord_ra
@@ -309,37 +309,37 @@ funcs:
     ixx:
         functor: Column
         args: slot_Shape_xx
-        dataset: meas
+        dataset: forced_src
     iyy:
         functor: Column
         args: slot_Shape_yy
-        dataset: meas
+        dataset: forced_src
     ixy:
         functor: Column
         args: slot_Shape_xy
-        dataset: meas
+        dataset: forced_src
     i_flag:
         functor: Column
         args: slot_Shape_flag
-        dataset: meas
+        dataset: forced_src
     # Icov: # need to compute
     # DM-22249 Evaluate whether we want to replace IxxPSF/IyyPSF/IxyPSF w/ FWHM
     ixxPSF:
         functor: Column
         args: slot_PsfShape_xx
-        dataset: meas
+        dataset: forced_src
     iyyPSF:
         functor: Column
         args: slot_PsfShape_yy
-        dataset: meas
+        dataset: forced_src
     ixyPSF:
         functor: Column
         args: slot_PsfShape_xy
-        dataset: meas
+        dataset: forced_src
     iPSF_flag:
         functor: Column
         args: slot_PsfShape_flag
-        dataset: meas
+        dataset: forced_src
     ixxRound:
         functor: Column
         args: slot_ShapeRound_xx
@@ -568,28 +568,28 @@ funcs:
     x:
         functor: Column
         args: slot_Centroid_x
-        dataset: ref
+        dataset: forced_src
     y:
         functor: Column
         args: slot_Centroid_y
-        dataset: ref
+        dataset: forced_src
     xErr:
         functor: Column
         args: slot_Centroid_xErr
-        dataset: ref
+        dataset: forced_src
     yErr:
         functor: Column
         args: slot_Centroid_yErr
-        dataset: ref
+        dataset: forced_src
     xy_flag:
         functor: Column
         args: slot_Centroid_flag
-        dataset: ref
+        dataset: forced_src
     # Not in DPDD
     blendedness:
         functor: Column
         args: base_Blendedness_abs
-        dataset: meas
+        dataset: forced_src
     # DM-22249: Make FWHM a view of IxxPsf IxyPsf IyyPsf
     # Or remove ixxPsf, IxyPsf, IyyPsf.
     fwhm:

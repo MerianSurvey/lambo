@@ -186,6 +186,12 @@ class GaapTask(object):
         self.merian.butler = dafButler.Butler(repo)
         self.merian.dataId = dict(tract=self.tract, patch=self.patch,
                                   band=band, skymap='hsc_rings_v1')
+        self.ref_deepCoadd_obj = self.merian.butler.get(
+            'deepCoadd_obj',
+            collections=self.merian.collections,
+            dataId=self.merian.dataId,
+            instrument='DECam',
+        )
         self.refCat = self.merian.butler.get(
             'deepCoadd_ref',
             collections=self.merian.collections,
@@ -294,7 +300,8 @@ class GaapTask(object):
         measureTask = lsst.meas.base.ForcedPhotCoaddTask(
             refSchema=self.refCat.schema, config=self.measureConfig)
         self.setLogger(measureTask)
-
+        measureTask.log.info(
+            '    - Running ForcedPhotCoaddTask on %s band' % band)
         measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.merian.butler.registry.expandDataId(self.merian.dataId),
                                                           exposure=self.exposures[band],
                                                           refCat=self.refCat,
@@ -311,6 +318,8 @@ class GaapTask(object):
                         refWcs=self.refExposure.wcs,
                         exposureId=exposureID)
         t2 = time.time()
+        measureTask.log.info(
+            '    - Finished ForcedPhotCoaddTask in %.2f seconds' % (t2 - t1))
         print("# Finished the GAaP measureTask in %.2f seconds." % (t2 - t1))
         self.forcedSrcCats[band] = measCat
 
@@ -405,12 +414,18 @@ class GaapTask(object):
         ----------
         https://github.com/lsst/pipe_tasks/blob/eee7ff78d7d7b7bcbdcc59fce9cbef2d184e5a8c/python/lsst/pipe/tasks/postprocess.py
         """
+        import warnings
+        warnings.filterwarnings("ignore")
+        from contextlib import suppress
+
         parq = MultilevelParquetTable(dataFrame=self.deepCoadd_obj)
         transConfig = TransformObjectCatalogConfig()
         if functorFile is not None:
             transConfig.functorFile = functorFile
-        transTask = TransformObjectCatalogTask(config=transConfig)
-        self.objectTable = transTask.run(parq)
+        with suppress(NotImplementedError):
+            transTask = TransformObjectCatalogTask(config=transConfig)
+            transTask.funcs.log.setLevel('FATAL')
+            self.objectTable = transTask.run(parq)
 
     def saveObjectTable(self):
         """
