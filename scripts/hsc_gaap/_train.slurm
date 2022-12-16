@@ -1,26 +1,22 @@
 #!/bin/bash
-#SBATCH -J NDE_gaapCosmos20_25_20_25
+#SBATCH -J gaap23
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem=24G
+#SBATCH --mem=32G
 #SBATCH --time=5:30:00
 #SBATCH --export=ALL
 
-#SBATCH -o ./log/gaap_gaapCosmos20_25_20_25.o
+#SBATCH -o ./log/slurm_gaap23.o
 #SBATCH --mail-type=all
 #SBATCH --mail-user=jiaxuanl@princeton.edu
 
 now=$(date +"%T")
 echo "start time ... $now"
-echo "My SLURM_ARRAY_JOB_ID is $SLURM_ARRAY_JOB_ID."
-echo "My SLURM_ARRAY_TASK_ID is $SLURM_ARRAY_TASK_ID"
-echo "Executing on the machine:" $(hostname)
 
 module purge
-. /home/jiaxuanl/Research/Merian/merian_tractor/scripts/setup_env_gen3.sh
+. /home/jiaxuanl/Research/Merian/merian_tractor/scripts/setup_env_w40.sh
 
-python run_gaap.py --seed_low=20 --seed_high=25 --n_jobs=5
-
+nice -n 0 python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[8] --patch_jobs=4 --hsc_type="S20A"
 
 now=$(date +"%T")
 echo "end time ... $now"

@@ -150,7 +150,7 @@ class GaapTask(object):
                     skymap='hsc_rings_v1',
                 )
         if self.logger is not None:
-            self.logger.info(
+            self.logger.debug(
                 'Loaded HSC {} deepCoadd_calexp images in {} bands'.format(self.hsc_type, self.bands))
 
     def _checkHSCfile(self):
@@ -193,12 +193,12 @@ class GaapTask(object):
         self.merian.butler = dafButler.Butler(repo)
         self.merian.dataId = dict(tract=self.tract, patch=self.patch,
                                   band=band, skymap='hsc_rings_v1')
-        self.ref_deepCoadd_obj = self.merian.butler.get(
-            'deepCoadd_obj',
-            collections=self.merian.collections,
-            dataId=self.merian.dataId,
-            instrument='DECam',
-        )
+        # self.ref_deepCoadd_obj = self.merian.butler.get(
+        #     'deepCoadd_obj',
+        #     collections=self.merian.collections,
+        #     dataId=self.merian.dataId,
+        #     instrument='DECam',
+        # )
         self.refCat = self.merian.butler.get(
             'deepCoadd_ref',
             collections=self.merian.collections,
@@ -249,7 +249,7 @@ class GaapTask(object):
                 self.exposures[band].setWcs(self.refExposure.getWcs())
 
         if self.logger is not None:
-            self.logger.info(
+            self.logger.debug(
                 f'Loaded Merian reference catalog and image in {self.merian_refBand} band')
 
     def setDefaultMeasureConfig(self):
@@ -306,7 +306,7 @@ class GaapTask(object):
         """
         if pool is not None:
             if self.logger is not None:
-                self.logger.info(
+                self.logger.debug(
                     'Running ForcedPhotCoaddTask on all bands using multiprocessing')
             pool.map(self.run, self.bands)
             pool.close()
@@ -328,7 +328,7 @@ class GaapTask(object):
             logger = measureTask.log
 
         logger.info(
-            f'    - Patch {self.patch}: Running ForcedPhotCoaddTask on {band} band')
+            f'    - Patch {self.patch}: Generating ForcedPhotCoadd catalog for {band} band')
         measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.merian.butler.registry.expandDataId(self.merian.dataId),
                                                           exposure=self.exposures[band],
                                                           refCat=self.refCat,
@@ -336,6 +336,8 @@ class GaapTask(object):
                                                           refWcs=self.refExposure.wcs,
                                                           idPackerName='tract_patch',
                                                           footprintData=self.footprintCatInBand)
+        logger.info(
+            f'    - Patch {self.patch}: Running ForcedPhotCoaddTask on {band} band')
         print(
             f"# Starting the GAaP measureTask for patch={self.patch}, band={band} at", time.ctime())
         t1 = time.time()
@@ -346,7 +348,7 @@ class GaapTask(object):
                         exposureId=exposureID)
         t2 = time.time()
         logger.info(
-            '    - Patch {self.patch}: Finished ForcedPhotCoaddTask in %.2f seconds' % (t2 - t1))
+            f'    - Patch {self.patch}: band {band}, Finished ForcedPhotCoaddTask in {(t2 - t1):.2f} seconds')
         print("# Finished the GAaP measureTask in %.2f seconds." % (t2 - t1))
         self.forcedSrcCats[band] = measCat
 
