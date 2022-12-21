@@ -66,12 +66,13 @@ from lsst.afw.table import SourceCatalog
 import lsst.daf.butler as dafButler
 import astropy.units as u
 from astropy.table import QTable, Table, vstack
+from multiprocessing import Process, Manager
 
 
 class GaapTask(object):
     def __init__(self, tract, patch, bands, hsc_type='S20A',
                  repo='/projects/MERIAN/repo/', collections='S20A/deepCoadd_calexp',
-                 is_merian=False, logger=None, log_level='INFO'):
+                 is_merian=False, logger=None, log_level='DEBUG'):
         """
         Run GAaP on one patch of one tract of HSC data.
 
@@ -114,7 +115,8 @@ class GaapTask(object):
             self.hsc_type = hsc_type
             self.exposures = {}
             self._get_exposure()
-            self.forcedSrcCats = {}
+            manager = Manager()
+            self.forcedSrcCats = manager.dict()
 
     def _get_exposure(self):
         """
@@ -319,6 +321,8 @@ class GaapTask(object):
         """
         Run ``gaap`` photometry on a single band.
         """
+        # self.band = band
+        # self.forcedSrcCats[band] = band
         measureTask = lsst.meas.base.ForcedPhotCoaddTask(
             refSchema=self.refCat.schema, config=self.measureConfig)
         self.setLogger(measureTask)
@@ -369,6 +373,7 @@ class GaapTask(object):
                               'meas': SourceCatalog()  # empty
                               }
         self.deepCoadd_obj = writeTask.run(catalogs, self.tract, self.patch)
+        print(self.logger)
         if self.logger is not None:
             self.logger.info(
                 f'    - Patch {self.patch}: Finished WriteObjectTableTask')
@@ -428,7 +433,7 @@ class GaapTask(object):
         self.outCat.write(self.outCatFileName, overwrite=True)
         if self.logger is not None:
             self.logger.info(
-                f'Patch {self.patch}: Wrote GAaP table to {self.outCatFileName}')
+                f'    - Patch {self.patch}: Wrote GAaP table to {self.outCatFileName}')
         print('Wrote GAaP table to', self.outCatFileName)
 
 

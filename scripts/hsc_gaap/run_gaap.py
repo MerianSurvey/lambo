@@ -7,6 +7,7 @@ import lsst.pex.exceptions
 import lsst.meas.extensions.gaap
 from functools import partial
 from itertools import product
+import traceback
 import fire
 import sys
 import os
@@ -63,15 +64,17 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
         gaap.transformObjectCatalog(
             functorFile='/home/jiaxuanl/Research/Merian/merian_tractor/scripts/hsc_gaap/Object.yaml')
         gaap.saveObjectTable()
+        logger.info(f'    - Patch {patch}: Wrote GAaP table')
 
         if logger is not None:
             logger.info(
-                f'    Succeeded for tract = {tract}, patch = {patch}, bands = {bands}')
+                f'    - Patch {patch}: Succeeded for tract = {tract}, patch = {patch}, bands = {bands}')
         del gaap
         gc.collect()
         print('\n')
     except Exception as e:
-        print(e)
+        print('ERROR:', e)
+        print(traceback.format_exc())
 
 
 def runGaapRowColumn(patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, hsc_type='S20A'):
@@ -101,11 +104,6 @@ def runGaapRowColumn(patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter
     else:
         pool = None
 
-    if filter_jobs is not None:
-        filter_pool = mp.Pool(filter_jobs)
-    else:
-        filter_pool = None
-
     if pool is not None:
         pool.map(partial(runGaap, bands=bands,
                          hsc_type=hsc_type, logger=logger, filter_pool=filter_pool), patches)
@@ -113,6 +111,10 @@ def runGaapRowColumn(patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter
         pool.join()
     else:
         for patch in patches:
+            if filter_jobs is not None:
+                filter_pool = mp.Pool(filter_jobs)
+            else:
+                filter_pool = None
             runGaap(patch, bands=bands,
                     hsc_type=hsc_type, logger=logger, filter_pool=filter_pool)
 
@@ -132,4 +134,4 @@ if __name__ == '__main__':
 # python run_gaap.py --patch_cols=[3,4,5,6,7] --patch_rows=[2] --njobs=2 --hsc_type="w_2022_40" --bands='ri' # gaap_w40
 
 ########## test ##########
-# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[7] --patch_jobs=None --filter_jobs=5 --hsc_type="S20A"
+# python run_gaap.py --patch_cols=[0] --patch_rows=[7] --patch_jobs=None --filter_jobs=5 --hsc_type="S20A"
