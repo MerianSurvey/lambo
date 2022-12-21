@@ -96,15 +96,25 @@ def runGaapRowColumn(patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter
     patches_old = list(itertools.product(patch_cols, patch_rows))
     patches = [item[0] + item[1] * 9 for item in patches_old]
 
-    patch_pool = mp.Pool(patch_jobs)
+    if patch_jobs is not None:
+        pool = mp.Pool(patch_jobs)
+    else:
+        pool = None
+
     if filter_jobs is not None:
         filter_pool = mp.Pool(filter_jobs)
     else:
         filter_pool = None
-    patch_pool.map(partial(runGaap, bands=bands,
-                           hsc_type=hsc_type, logger=logger, filter_pool=filter_pool), patches)
-    patch_pool.close()
-    patch_pool.join()
+
+    if pool is not None:
+        pool.map(partial(runGaap, bands=bands,
+                         hsc_type=hsc_type, logger=logger, filter_pool=filter_pool), patches)
+        pool.close()
+        pool.join()
+    else:
+        for patch in patches:
+            runGaap(patch, bands=bands,
+                    hsc_type=hsc_type, logger=logger, filter_pool=filter_pool)
 
 
 if __name__ == '__main__':
@@ -122,4 +132,4 @@ if __name__ == '__main__':
 # python run_gaap.py --patch_cols=[3,4,5,6,7] --patch_rows=[2] --njobs=2 --hsc_type="w_2022_40" --bands='ri' # gaap_w40
 
 ########## test ##########
-# nice -n 10 python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[7] --patch_jobs=6 --hsc_type="S20A" # gaap5
+# python run_gaap.py --patch_cols=[0,1,2,3,4,5,6,7,8] --patch_rows=[7] --patch_jobs=None --filter_jobs=5 --hsc_type="S20A"

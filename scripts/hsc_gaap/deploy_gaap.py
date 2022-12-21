@@ -6,23 +6,24 @@ import sys
 import fire
 
 
-def deploy_training_job(seed_low, seed_high, njobs=5, python_file='run_gaap.py',
+def deploy_training_job(patch_cols, patch_rows, patch_jobs=None, filter_jobs=5, 
+                        python_file='run_gaap.py',
                         name='gaapCosmos', multijobs=False):
     ''' create slurm script and then submit 
     '''
-    time = "5:30:00"
-    name = name + str(seed_low) + '_' + str(seed_high)
-
+    time = "12:30:00"
+    # name = name
+    
     cntnt = '\n'.join([
         "#!/bin/bash",
-        f"#SBATCH -J NDE_%s_{seed_low}_{seed_high}" % (name),
+        f"#SBATCH -J NDE_%s_{patch_rows}" % (name),
         "#SBATCH --nodes=1",
-        f"#SBATCH --ntasks-per-node=1",  # {njobs}
+        f"#SBATCH --ntasks-per-node={filter_jobs}",  # {njobs}
         "#SBATCH --mem=24G",
         "#SBATCH --time=%s" % time,
         "#SBATCH --export=ALL",
-        f"#SBATCH --array={seed_low}-{seed_high}" if multijobs else "",
-        f"#SBATCH -o ./log/gaap_{name}_{seed_low}_{seed_high}.o",
+        # f"#SBATCH --array={seed_low}-{seed_high}" if multijobs else "",
+        f"#SBATCH -o ./log/gaap_{name}_{patch_rows}.o",
         "#SBATCH --mail-type=all",
         "#SBATCH --mail-user=jiaxuanl@princeton.edu",
         "",
@@ -33,9 +34,9 @@ def deploy_training_job(seed_low, seed_high, njobs=5, python_file='run_gaap.py',
         'echo "Executing on the machine:" $(hostname)',
         "",
         "module purge",
-        ". /home/jiaxuanl/Research/Merian/merian_tractor/scripts/setup_env_gen3.sh",
+        ". /home/jiaxuanl/Research/Merian/merian_tractor/scripts/setup_env_w40.sh",
         "",
-        f"python {python_file} --seed_low={seed_low} --seed_high={seed_high} --n_jobs={njobs}",
+        f"python {python_file} --patch_cols='{patch_cols}' --patch_rows='{patch_rows}' --patch_jobs={patch_jobs} --filter_jobs={filter_jobs} --hsc_type='S20A'",
         "",
         "",
         'now=$(date +"%T")',
@@ -47,7 +48,7 @@ def deploy_training_job(seed_low, seed_high, njobs=5, python_file='run_gaap.py',
     f.write(cntnt)
     f.close()
     os.system('sbatch _train.slurm')
-    #os.system('rm _train.slurm')
+    # os.system('rm _train.slurm')
     return None
 
 
@@ -56,4 +57,5 @@ if __name__ == '__main__':
 
 # 22.09.14
 
-# python deploy_gaap.py --seed_low=20 --seed_high=25 --njobs=5
+# python deploy_gaap.py --patch_cols="[0,1,2,3,4,5,6,7,8]" --patch_rows="[6]" --patch_jobs=None --filter_jobs=5
+# python deploy_gaap.py --patch_cols="[0,1,2,3,4,5,6,7,8]" --patch_rows="[7]" --patch_jobs=None --filter_jobs=5
