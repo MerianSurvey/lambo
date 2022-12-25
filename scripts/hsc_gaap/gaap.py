@@ -72,7 +72,7 @@ from multiprocessing import Process, Manager
 class GaapTask(object):
     def __init__(self, tract, patch, bands, hsc_type='S20A',
                  repo='/projects/MERIAN/repo/', collections='S20A/deepCoadd_calexp',
-                 is_merian=False, logger=None, log_level='DEBUG'):
+                 is_merian=False, logger=None, log_level='INFO'):
         """
         Run GAaP on one patch of one tract of HSC data.
 
@@ -353,7 +353,7 @@ class GaapTask(object):
         t2 = time.time()
         logger.info(
             f'    - Patch {self.patch}: band {band}, Finished ForcedPhotCoaddTask in {(t2 - t1):.2f} seconds')
-        print("# Finished the GAaP measureTask in %.2f seconds." % (t2 - t1))
+        print(f"# Finished the GAaP measureTask for band {band} in %.2f seconds." % (t2 - t1))
         self.forcedSrcCats[band] = measCat
 
     def writeObjectTable(self):

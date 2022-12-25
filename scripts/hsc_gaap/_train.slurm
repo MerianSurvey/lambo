@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH -J NDE_gaapCosmos_[7]
+#SBATCH -J NDE_gaapCosmos_[4, 8]
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=5
-#SBATCH --mem=24G
+#SBATCH --ntasks-per-node=3
+#SBATCH --mem=20G
 #SBATCH --time=12:30:00
 #SBATCH --export=ALL
-#SBATCH -o ./log/gaap_gaapCosmos_[7].o
+#SBATCH -o ./log/gaap_gaapCosmos_[4, 8].o
 #SBATCH --mail-type=all
 #SBATCH --mail-user=jiaxuanl@princeton.edu
 
@@ -18,7 +18,7 @@ echo "Executing on the machine:" $(hostname)
 module purge
 . /home/jiaxuanl/Research/Merian/merian_tractor/scripts/setup_env_w40.sh
 
-python run_gaap.py --patch_cols='[0, 1, 2, 3, 4, 5, 6, 7, 8]' --patch_rows='[7]' --patch_jobs=None --filter_jobs=5 --hsc_type='S20A'
+python run_gaap.py --patch_cols='[7]' --patch_rows='[4, 8]' --patch_jobs=None --filter_jobs=2 --hsc_type='S20A'
 
 
 now=$(date +"%T")
