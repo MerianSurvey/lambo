@@ -453,11 +453,11 @@ def consolidateObjectTables(patches, tract=9813, hsc_type='S20A'):
     cats = []
     for patch in patches:
         patch_old = f'{patch % 9},{patch // 9}'
-        outCatDir = os.path.join('/projects/MERIAN/repo/', 'S20A', 'gaapTable',
+        inCatDir = os.path.join('/projects/MERIAN/repo/', 'S20A', 'gaapTable',
                                  str(tract), str(patch_old))
-        outCatFileName = os.path.join(outCatDir,
+        inCatFileName = os.path.join(inCatDir,
                                       f'objectTable_{tract}_{patch_old}_{hsc_type}.fits')
-        cats.append(Table.read(outCatFileName))
+        cats.append(Table.read(inCatFileName))
     return vstack(cats)
 
 

@@ -6,7 +6,7 @@ import sys
 import fire
 
 
-def deploy_training_job(patch_cols, patch_rows, patch_jobs=None, filter_jobs=5,
+def deploy_training_job(tract, patch_cols, patch_rows, patch_jobs=None, filter_jobs=5,
                         python_file='run_gaap.py',
                         name='gaapCosmos', multijobs=False):
     ''' create slurm script and then submit 
@@ -16,14 +16,14 @@ def deploy_training_job(patch_cols, patch_rows, patch_jobs=None, filter_jobs=5,
 
     cntnt = '\n'.join([
         "#!/bin/bash",
-        f"#SBATCH -J NDE_%s_{patch_rows}" % (name),
+        f"#SBATCH -J %s_{tract}_{patch_rows}" % (name),
         "#SBATCH --nodes=1",
         f"#SBATCH --ntasks-per-node={filter_jobs+1}",  # {njobs}
         f"#SBATCH --mem={int(filter_jobs * 10)}G",
         "#SBATCH --time=%s" % time,
         "#SBATCH --export=ALL",
         # f"#SBATCH --array={seed_low}-{seed_high}" if multijobs else "",
-        f"#SBATCH -o ./log/gaap_{name}_{patch_rows}.o",
+        f"#SBATCH -o ./log/{name}_{tract}_{patch_rows}.o",
         "#SBATCH --mail-type=all",
         "#SBATCH --mail-user=jiaxuanl@princeton.edu",
         "",
@@ -36,7 +36,7 @@ def deploy_training_job(patch_cols, patch_rows, patch_jobs=None, filter_jobs=5,
         "module purge",
         ". /home/jiaxuanl/Research/Merian/merian_tractor/scripts/setup_env_w40.sh",
         "",
-        f"python {python_file} --patch_cols='{patch_cols}' --patch_rows='{patch_rows}' --patch_jobs={patch_jobs} --filter_jobs={filter_jobs} --hsc_type='S20A'",
+        f"python {python_file} --tract={tract} --patch_cols='{patch_cols}' --patch_rows='{patch_rows}' --patch_jobs={patch_jobs} --filter_jobs={filter_jobs} --hsc_type='S20A'",
         "",
         "",
         'now=$(date +"%T")',
@@ -55,9 +55,5 @@ def deploy_training_job(patch_cols, patch_rows, patch_jobs=None, filter_jobs=5,
 if __name__ == '__main__':
     fire.Fire(deploy_training_job)
 
-# 22.09.14
-# python deploy_gaap.py --patch_cols="[0,1,2,3,4,5,6,7,8]" --patch_rows="[7]" --patch_jobs=None --filter_jobs=5
-# python deploy_gaap.py --patch_cols="[0,1,2,3,4,5,6,7,8]" --patch_rows="[8]" --patch_jobs=None --filter_jobs=5
-# python deploy_gaap.py --patch_cols="[3,4,5,6,7,8]" --patch_rows="[3]" --patch_jobs=None --filter_jobs=5
-# python deploy_gaap.py --patch_cols="[3,4,5,6,7,8]" --patch_rows="[4]" --patch_jobs=None --filter_jobs=5
-# python deploy_gaap.py --patch_cols="[7]" --patch_rows="[4,8]" --patch_jobs=None --filter_jobs=2
+# Examples
+# python deploy_gaap.py --tract=9813 --patch_cols="[0,1,2,3,4,5,6,7,8]" --patch_rows="[0]" --patch_jobs=None --filter_jobs=5

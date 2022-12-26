@@ -16,17 +16,26 @@ sys.path.append('/home/jiaxuanl/Research/Merian/merian_tractor/scripts/')
 import multiprocess as mp
 mp.freeze_support()
 
-old_patches = [name for name in os.listdir(
-    "/projects/MERIAN/repo/S20A/deepCoadd_calexp/9813/")]
-new_patches = [int(name[0]) + int(name[2]) * 9 for name in old_patches]
-merian_patches = [int(name) for name in os.listdir(
-    "/projects/MERIAN/repo/DECam/runs/merian/dr1_wide/20220921T193246Z/deepCoadd_forced_src/9813")]
-common_patches = np.intersect1d(new_patches, merian_patches)
-
 from hsc_gaap.gaap import GaapTask, NaiveLogger
 import gc
 
 def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, filter_pool=None):
+    old_patches = [name for name in os.listdir(
+        f"/projects/MERIAN/repo/S20A/deepCoadd_calexp/{tract}/")]
+    new_patches = [int(name[0]) + int(name[2]) * 9 for name in old_patches]
+    
+    import lsst.daf.butler as dafButler
+    butler = dafButler.Butler("/projects/MERIAN/repo")
+    merian_patches = [item.dataId['patch'] for item in butler.registry.queryDatasets('objectTable', 
+                              dataId=dict(tract=tract), collections='DECam/runs/merian/dr1_wide',
+                              instrument='DECam',
+                              skymap='hsc_rings_v1')]
+    merian_patches = np.unique(merian_patches)
+    # merian_patches = [int(name) for name in os.listdir(
+    #     f"/projects/MERIAN/repo/DECam/runs/merian/dr1_wide/20220921T193246Z/deepCoadd_forced_src/{tract}")]
+    common_patches = np.intersect1d(new_patches, merian_patches)
+    logger.info(f'In tract = {tract}, there are {len(common_patches)} common patches')
+    
     try:
         if patch not in common_patches:
             if logger is not None:
@@ -76,7 +85,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
         print(traceback.format_exc())
 
 
-def runGaapRowColumn(patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, hsc_type='S20A'):
+def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, hsc_type='S20A'):
     """
     This function uses ``multiprocessing`` to run ``runGaap`` in parallel.
     The "parallel" is in the sense that the patches are processed in parallel, not the bands.
@@ -94,7 +103,7 @@ def runGaapRowColumn(patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter
     import itertools
     if os.path.isdir('./log') is False:
         os.mkdir('./log')
-    logger = NaiveLogger(f'./log/gaap_{patch_rows}.log')
+    logger = NaiveLogger(f'./log/gaap_{tract}_{patch_rows}.log')
     patches_old = list(itertools.product(patch_cols, patch_rows))
     patches = [item[0] + item[1] * 9 for item in patches_old]
 
@@ -115,7 +124,7 @@ def runGaapRowColumn(patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter
             filter_pool = mp.Pool(filter_jobs)
         else:
             filter_pool = None
-        runGaap(patch, bands=bands,
+        runGaap(patch, tract, bands=bands,
                 hsc_type=hsc_type, logger=logger, filter_pool=filter_pool)
         gc.collect()
     
