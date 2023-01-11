@@ -12,16 +12,17 @@ import fire
 import sys
 import os
 import gc
-sys.path.append('/home/jiaxuanl/Research/Merian/merian_tractor/scripts/')
+sys.path.append(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/'))
 import multiprocess as mp
 mp.freeze_support()
+from astropy.coordinates import SkyCoord
+import astropy.units as u
 
 from hsc_gaap.gaap import GaapTask, NaiveLogger
-import gc
 
-def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, filter_pool=None):
+def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, filter_pool=None, repo='/projects/MERIAN/repo/'):
     old_patches = [name for name in os.listdir(
-        f"/projects/MERIAN/repo/S20A/deepCoadd_calexp/{tract}/")]
+        f"{repo}/S20A/deepCoadd_calexp/{tract}/")]
     new_patches = [int(name[0]) + int(name[2]) * 9 for name in old_patches]
     
     import lsst.daf.butler as dafButler
@@ -48,18 +49,18 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
 
         if hsc_type == 'S20A':
             gaap = GaapTask(tract, patch, bands, hsc_type='S20A',
-                            repo='/projects/MERIAN/repo/',
+                            repo=repo,
                             collections='S20A/deepCoadd_calexp',
                             logger=logger)
             gaap._checkHSCfile()
         elif hsc_type == 'w_2022_40':
             gaap = GaapTask(tract, patch, bands, hsc_type='w_2022_40',
-                            repo='/projects/HSC/repo/main',
+                            repo=repo,
                             collections='HSC/runs/RC2/w_2022_40/DM-36151',
                             logger=logger)
         elif hsc_type == 'w_2022_04':
             gaap = GaapTask(tract, patch, bands, hsc_type='w_2022_04',
-                            repo='/projects/MERIAN/repo/',
+                            repo=repo,
                             collections='HSC/runs/RC2/w_2022_04/DM-33402',
                             logger=logger)
 
@@ -71,7 +72,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
         gaap.runAll(filter_pool)
         gaap.writeObjectTable()
         gaap.transformObjectCatalog(
-            functorFile='/home/jiaxuanl/Research/Merian/merian_tractor/scripts/hsc_gaap/Object.yaml')
+            functorFile=os.path.join(os.getenv('LAMBO_HOME'),'lambo/scripts/hsc_gaap/Object.yaml'))
         gaap.saveObjectTable()
 
         if logger is not None:
@@ -85,7 +86,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
         print(traceback.format_exc())
 
 
-def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, hsc_type='S20A'):
+def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, hsc_type='S20A', repo='/projects/MERIAN/repo/'):
     """
     This function uses ``multiprocessing`` to run ``runGaap`` in parallel.
     The "parallel" is in the sense that the patches are processed in parallel, not the bands.
@@ -100,11 +101,10 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
         The row numbers of the patches to be processed, following the old patch pattern.
 
     """
-    import itertools
     if os.path.isdir('./log') is False:
         os.mkdir('./log')
     logger = NaiveLogger(f'./log/gaap_{tract}_{patch_rows}.log')
-    patches_old = list(itertools.product(patch_cols, patch_rows))
+    patches_old = list(product(patch_cols, patch_rows))
     patches = [item[0] + item[1] * 9 for item in patches_old]
 
     # if patch_jobs is not None:
@@ -125,9 +125,53 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
         else:
             filter_pool = None
         runGaap(patch, tract, bands=bands,
-                hsc_type=hsc_type, logger=logger, filter_pool=filter_pool)
+                hsc_type=hsc_type, logger=logger, filter_pool=filter_pool, repo=repo)
+
+        matchBlendedness(tract, patch_cols, patch_rows, repo=repo)
+
         gc.collect()
     
+def matchBlendedness(tract, patch_cols, patch_rows, repo ='/projects/MERIAN/repo/', matchdist=0.5, matchmag=10):
+    """
+    Crossmatch gaap catalog with S20A blendedness catalog.
+    Matches objects that are separated by less than matchdist arcseconds and 
+    have 3-pixel-aperture g-band flux with at most matchmag nJy disagreement.
+       
+     Parameters
+    ----------
+    matchdist : float
+        Maximum matching distance in arcseconds
+    matchmag : float.
+        Maximum 3-pixel-aperture g-band flux difference for matching.
+
+    """
+    patches = list(product(patch_cols, patch_rows))
+
+    for patch in patches:
+        gaapCat_dir  = os.path.join(repo, "S20A/gaapTable/", f"{tract}", f"{patch[0]},{patch[1]}")
+        gaapCat_file = f"objectTable_{tract}_{patch[0]},{patch[1]}_S20A.fits"
+        gaapCat  = Table.read(os.path.join(gaapCat_dir, gaapCat_file))
+        blendCat = Table.read(os.path.join(gaapCat_dir, f"S20A_blendedness_{patch[0]},{patch[1]}.fits"))
+
+        old_cols = [f'm_{filt}_blendedness_abs' for filt in 'grizy'] + [f'm_{filt}_blendedness_flag' for filt in 'grizy']
+        old_cols +=  [f'{filt}_apertureflux_10_flux' for filt in 'grizy'] + [f'{filt}_apertureflux_10_flag' for filt in 'grizy']
+        new_cols = [f'{filt}_blendedness' for filt in 'grizy'] + [f'{filt}_blendedness_flag' for filt in 'grizy']
+        new_cols += [f'{filt}_apertureflux10_S20A' for filt in 'grizy'] + [f'{filt}_apertureflux10_flag_S20A' for filt in 'grizy']
+        blendCat.rename_columns(old_cols, new_cols)
+
+        _gaap = SkyCoord(gaapCat['coord_ra'], gaapCat['coord_dec'], unit='deg')
+        _blend = SkyCoord(blendCat['ra'], blendCat['dec'], unit='deg')
+        ind, dist, _ = _gaap.match_to_catalog_sky(_blend)
+
+        match = (dist < .5 * u.arcsec) & (abs(gaapCat["g_ap03Flux"] - blendCat["g_apertureflux10_S20A"][ind]) < 10)
+
+        for col in new_cols:
+            gaapCat[col] = np.ones(len(gaapCat)) * np.nan
+            gaapCat[col][match] = blendCat[ind[match]][col]
+
+        gaapCat.write(os.path.join(gaapCat_dir, gaapCat_file) , overwrite=True)
+
+
 
 if __name__ == '__main__':
     fire.Fire(runGaapRowColumn)
