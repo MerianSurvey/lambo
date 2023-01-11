@@ -422,7 +422,7 @@ class GaapTask(object):
             If not specified, use the default file name.
         """
         self.outCat = Table.from_pandas(self.objectTable, index='objectId')
-        self.outCatDir = os.path.join('/projects/MERIAN/repo/', 'S20A', 'gaapTable',
+        self.outCatDir = os.path.join(self.repo, 'S20A', 'gaapTable',
                                       str(self.tract), str(
                                           self.patch_old))
         self.outCatFileName = os.path.join(self.outCatDir,
@@ -437,7 +437,7 @@ class GaapTask(object):
         print('Wrote GAaP table to', self.outCatFileName)
 
 
-def consolidateObjectTables(patches, tract=9813, hsc_type='S20A'):
+def consolidateObjectTables(patches, tract=9813, hsc_type='S20A', repo='/projects/MERIAN/repo/'):
     """
     Concatenate catalogs in multiple patches.
 
@@ -449,11 +449,12 @@ def consolidateObjectTables(patches, tract=9813, hsc_type='S20A'):
         Tract number.
     hsc_type : str.
         The version of HSC data. E.g., ``S20A`` or ``w_2020_40``.
-    """
+    repo : str, optional.
+        The path to the data repo. The default is '/projects/MERIAN/repo/'.    """
     cats = []
     for patch in patches:
         patch_old = f'{patch % 9},{patch // 9}'
-        inCatDir = os.path.join('/projects/MERIAN/repo/', 'S20A', 'gaapTable',
+        inCatDir = os.path.join(repo, 'S20A', 'gaapTable',
                                  str(tract), str(patch_old))
         inCatFileName = os.path.join(inCatDir,
                                       f'objectTable_{tract}_{patch_old}_{hsc_type}.fits')
