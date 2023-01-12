@@ -244,6 +244,12 @@ class GaapTask(object):
             instrument='DECam',
         )
 
+        self.exposureDataId = self.merian.butler.registry.expandDataId(
+            self.merian.dataId)
+
+        # kills the butler
+        del self.merian.butler
+
         # There can be very small differences in the WCS, so we need to make sure they are the same
         # If they are the same, then we overwrite the WCS in the exposure with the reference WCS
         for band in self.bands:
@@ -333,7 +339,7 @@ class GaapTask(object):
 
         logger.info(
             f'    - Patch {self.patch}: Generating ForcedPhotCoadd catalog for {band} band')
-        measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.merian.butler.registry.expandDataId(self.merian.dataId),
+        measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.exposureDataId,
                                                           exposure=self.exposures[band],
                                                           refCat=self.refCat,
                                                           refCatInBand=self.refCatInBand,
@@ -353,7 +359,8 @@ class GaapTask(object):
         t2 = time.time()
         logger.info(
             f'    - Patch {self.patch}: band {band}, Finished ForcedPhotCoaddTask in {(t2 - t1):.2f} seconds')
-        print(f"# Finished the GAaP measureTask for band {band} in %.2f seconds." % (t2 - t1))
+        print(
+            f"# Finished the GAaP measureTask for band {band} in %.2f seconds." % (t2 - t1))
         self.forcedSrcCats[band] = measCat
 
     def writeObjectTable(self):
@@ -455,9 +462,9 @@ def consolidateObjectTables(patches, tract=9813, hsc_type='S20A', repo='/project
     for patch in patches:
         patch_old = f'{patch % 9},{patch // 9}'
         inCatDir = os.path.join(repo, 'S20A', 'gaapTable',
-                                 str(tract), str(patch_old))
+                                str(tract), str(patch_old))
         inCatFileName = os.path.join(inCatDir,
-                                      f'objectTable_{tract}_{patch_old}_{hsc_type}.fits')
+                                     f'objectTable_{tract}_{patch_old}_{hsc_type}.fits')
         cats.append(Table.read(inCatFileName))
     return vstack(cats)
 
