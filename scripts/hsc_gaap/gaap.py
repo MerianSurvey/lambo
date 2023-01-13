@@ -192,22 +192,22 @@ class GaapTask(object):
         self.merian = GaapTask(self.tract, self.patch, None,
                                [band], repo, collections,
                                is_merian=True)
-        self.merian.butler = dafButler.Butler(repo)
+        self.merian_butler = dafButler.Butler(repo)
         self.merian.dataId = dict(tract=self.tract, patch=self.patch,
                                   band=band, skymap='hsc_rings_v1')
-        # self.ref_deepCoadd_obj = self.merian.butler.get(
+        # self.ref_deepCoadd_obj = self.merian_butler.get(
         #     'deepCoadd_obj',
         #     collections=self.merian.collections,
         #     dataId=self.merian.dataId,
         #     instrument='DECam',
         # )
-        self.refCat = self.merian.butler.get(
+        self.refCat = self.merian_butler.get(
             'deepCoadd_ref',
             collections=self.merian.collections,
             dataId=self.merian.dataId,
             instrument='DECam',
         )
-        self.refCatInBand = self.merian.butler.get(
+        self.refCatInBand = self.merian_butler.get(
             'deepCoadd_meas',
             collections='DECam/runs/merian/dr1_wide',
             dataId=self.merian.dataId,
@@ -230,25 +230,22 @@ class GaapTask(object):
             self.refCatInBand = temp.copy()
 
         # We use the scarlet model data to get the footprint
-        self.footprintCatInBand = self.merian.butler.get(
+        self.footprintCatInBand = self.merian_butler.get(
             'deepCoadd_scarletModelData',
             collections='DECam/runs/merian/dr1_wide',
             dataId=self.merian.dataId,
             instrument='DECam',
         )
 
-        self.refExposure = self.merian.butler.get(
+        self.refExposure = self.merian_butler.get(
             'deepCoadd_calexp',
             collections=self.merian.collections,
             dataId=self.merian.dataId,
             instrument='DECam',
         )
 
-        self.exposureDataId = self.merian.butler.registry.expandDataId(
+        self.exposureDataId = self.merian_butler.registry.expandDataId(
             self.merian.dataId)
-
-        # kills the butler
-        del self.merian.butler
 
         # There can be very small differences in the WCS, so we need to make sure they are the same
         # If they are the same, then we overwrite the WCS in the exposure with the reference WCS
@@ -327,6 +324,9 @@ class GaapTask(object):
         """
         Run ``gaap`` photometry on a single band.
         """
+        if hasattr(self, 'merian_butler'):
+            print('### Deleting merian_butler')
+            delattr(self, 'merian_butler')
         # self.band = band
         # self.forcedSrcCats[band] = band
         measureTask = lsst.meas.base.ForcedPhotCoaddTask(
