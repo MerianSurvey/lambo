@@ -152,6 +152,8 @@ def matchBlendedness(tract, patch_cols, patch_rows, repo='/projects/MERIAN/repo/
     patches = list(product(patch_cols, patch_rows))
 
     for patch in patches:
+
+
         gaapCat_dir = os.path.join(
             repo, "S20A/gaapTable/", f"{tract}", f"{patch[0]},{patch[1]}")
         gaapCat_file = f"objectTable_{tract}_{patch[0]},{patch[1]}_S20A.fits"
@@ -181,6 +183,7 @@ def matchBlendedness(tract, patch_cols, patch_rows, repo='/projects/MERIAN/repo/
             gaapCat[col][match] = blendCat[ind[match]][col]
 
         gaapCat.write(os.path.join(gaapCat_dir, gaapCat_file), overwrite=True)
+        print('Matched GAaP table with S20A blendedness.')
 
 
 if __name__ == '__main__':
