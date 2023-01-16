@@ -68,6 +68,8 @@ def deploy_training_job(tract, filter_jobs=5,
         outname = tract
     if not os.path.isdir('./slurmscripts'):
         os.mkdir("./slurmscripts")
+    if not os.path.isdir(f'./log/{tract}'):
+        os.makedirs(f'./log/{tract}')
     f = open(f'slurmscripts/{outname}.slurm', 'w')
     f.write(cntnt)
     f.close()

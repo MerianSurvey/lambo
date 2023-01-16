@@ -106,8 +106,8 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
         The row numbers of the patches to be processed, following the old patch pattern.
 
     """
-    if os.path.isdir('./log') is False:
-        os.mkdir('./log')
+    if os.path.isdir(f'./log/{tract}') is False:
+        os.makedirs(f'./log/{tract}')
     logger = NaiveLogger(f'./log/{tract}/{patch_cols[0] + patch_rows[0] * 9}.log')
     patches_old = list(product(patch_cols, patch_rows))
     patches = [item[0] + item[1] * 9 for item in patches_old]
@@ -126,7 +126,7 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
     for patch in patches:
         if filter_jobs is not None:
             print('Using filter pool: ', filter_jobs, 'jobs')
-            
+
         runGaap(patch, tract, bands=bands,
                 hsc_type=hsc_type, logger=logger, filter_jobs=filter_jobs, repo=repo)
 
