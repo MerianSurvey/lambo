@@ -78,5 +78,6 @@ def deploy_training_job(tract, filter_jobs=5,
 if __name__ == '__main__':
     fire.Fire(deploy_training_job)
 
+
 # Examples
 # python3 deploy_gaap_array.py --tract=8520  --repo="/scratch/gpfs/am2907/Merian/gaap" --submit=True
