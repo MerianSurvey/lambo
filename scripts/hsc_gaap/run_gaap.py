@@ -19,16 +19,17 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 
 from hsc_gaap.gaap import GaapTask, NaiveLogger
+import lsst.daf.butler as dafButler
 
 
-def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, filter_pool=None, repo='/projects/MERIAN/repo/'):
+def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, filter_jobs=None, repo='/projects/MERIAN/repo/'):
     old_patches = [name for name in os.listdir(
         f"{repo}/S20A/deepCoadd_calexp/{tract}/")]
     new_patches = [int(name[0]) + int(name[2]) * 9 for name in old_patches]
 
-    import lsst.daf.butler as dafButler
-    butler = dafButler.Butler("/projects/MERIAN/repo")
-    merian_patches = [item.dataId['patch'] for item in butler.registry.queryDatasets('objectTable',
+    print("Starting butler")
+    merian_butler = dafButler.Butler("/projects/MERIAN/repo")
+    merian_patches = [item.dataId['patch'] for item in merian_butler.registry.queryDatasets('objectTable',
                                                                                      dataId=dict(tract=tract), collections='DECam/runs/merian/dr1_wide',
                                                                                      instrument='DECam',
                                                                                      skymap='hsc_rings_v1')]
@@ -39,6 +40,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
     logger.info(
         f'In tract = {tract}, there are {len(common_patches)} common patches')
 
+    filter_pool = mp.Pool(filter_jobs)
     try:
         if patch not in common_patches:
             if logger is not None:
@@ -53,7 +55,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
             gaap = GaapTask(tract, patch, bands, hsc_type='S20A',
                             repo=repo,
                             collections='S20A/deepCoadd_calexp',
-                            logger=logger)
+                            logger=logger, merian_butler=merian_butler)
             gaap._checkHSCfile()
         elif hsc_type == 'w_2022_40':
             gaap = GaapTask(tract, patch, bands, hsc_type='w_2022_40',
@@ -70,6 +72,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
                                    repo='/projects/MERIAN/repo/',
                                    collections='DECam/runs/merian/dr1_wide'
                                    )
+        del merian_butler
         gaap.setDefaultMeasureConfig()
         gaap.runAll(filter_pool)
         gaap.writeObjectTable()
@@ -105,7 +108,7 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
     """
     if os.path.isdir('./log') is False:
         os.mkdir('./log')
-    logger = NaiveLogger(f'./log/gaap_{tract}_{patch_rows}.log')
+    logger = NaiveLogger(f'./log/{tract}/{patch_cols[0] + patch_rows[0] * 9}.log')
     patches_old = list(product(patch_cols, patch_rows))
     patches = [item[0] + item[1] * 9 for item in patches_old]
 
@@ -123,11 +126,9 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
     for patch in patches:
         if filter_jobs is not None:
             print('Using filter pool: ', filter_jobs, 'jobs')
-            filter_pool = mp.Pool(filter_jobs)
-        else:
-            filter_pool = None
+            
         runGaap(patch, tract, bands=bands,
-                hsc_type=hsc_type, logger=logger, filter_pool=filter_pool, repo=repo)
+                hsc_type=hsc_type, logger=logger, filter_jobs=filter_jobs, repo=repo)
 
         matchBlendedness(tract, patch_cols, patch_rows, repo=repo)
 
