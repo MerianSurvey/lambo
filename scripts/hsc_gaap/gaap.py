@@ -72,7 +72,7 @@ from multiprocessing import Process, Manager
 class GaapTask(object):
     def __init__(self, tract, patch, bands, hsc_type='S20A',
                  repo='/projects/MERIAN/repo/', collections='S20A/deepCoadd_calexp',
-                 is_merian=False, logger=None, log_level='INFO'):
+                 is_merian=False, logger=None, log_level='INFO', merian_butler=None):
         """
         Run GAaP on one patch of one tract of HSC data.
 
@@ -107,6 +107,7 @@ class GaapTask(object):
         self.log_level = log_level
         self.patch_old = f'{self.patch % 9},{self.patch // 9}'
         self.logger = logger
+        self.merian_butler = merian_butler
 
         if self.logger is not None:
             logger.setLevel(self.log_level)
@@ -192,7 +193,11 @@ class GaapTask(object):
         self.merian = GaapTask(self.tract, self.patch, None,
                                [band], repo, collections,
                                is_merian=True)
-        self.merian_butler = dafButler.Butler(repo)
+
+        if self.merian_butler is None:
+            print("New butler")
+            self.merian_butler = dafButler.Butler(repo)
+
         self.merian.dataId = dict(tract=self.tract, patch=self.patch,
                                   band=band, skymap='hsc_rings_v1')
         # self.ref_deepCoadd_obj = self.merian_butler.get(
@@ -246,6 +251,9 @@ class GaapTask(object):
 
         self.exposureDataId = self.merian_butler.registry.expandDataId(
             self.merian.dataId)
+
+        print("Deleting merian_butler")
+        del self.merian_butler
 
         # There can be very small differences in the WCS, so we need to make sure they are the same
         # If they are the same, then we overwrite the WCS in the exposure with the reference WCS
@@ -324,11 +332,7 @@ class GaapTask(object):
         """
         Run ``gaap`` photometry on a single band.
         """
-        if hasattr(self, 'merian_butler'):
-            print('### Deleting merian_butler')
-            delattr(self, 'merian_butler')
-        # self.band = band
-        # self.forcedSrcCats[band] = band
+        
         measureTask = lsst.meas.base.ForcedPhotCoaddTask(
             refSchema=self.refCat.schema, config=self.measureConfig)
         self.setLogger(measureTask)
