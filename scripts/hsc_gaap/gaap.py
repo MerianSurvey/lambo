@@ -455,13 +455,21 @@ def consolidateObjectTables(patches, tract=9813, hsc_type='S20A', repo='/project
     Parameters
     ----------
     patches : list of int.
-        List of patches, in modern format.
+        List of patches, in modern format. If given an empty list, all Merian-reduced patches
+        in the tract are used. 
     tract : int.
         Tract number.
     hsc_type : str.
         The version of HSC data. E.g., ``S20A`` or ``w_2020_40``.
     repo : str, optional.
         The path to the data repo. The default is '/projects/MERIAN/repo/'.    """
+
+    if len(patches) == 0:
+
+        output_collection = "DECam/runs/merian/dr1_wide"
+        skymap = "hsc_rings_v1"
+        patches = findReducedPatches(tract, band="N708", output_collection=output_collection, skymap=skymap)
+
     cats = []
     for patch in patches:
         patch_old = f'{patch % 9},{patch // 9}'
@@ -529,3 +537,37 @@ def NaiveLogger(filename):
     logger = logging.getLogger('GaapMaster')
 
     return logger
+
+def findReducedPatches(tract, band="N708", output_collection='DECam/runs/merian/dr1_wide', skymap='hsc_rings_v1'):
+    """Find all patches that have the necessary Merian data products for gaap photometry"""
+
+    butler = dafButler.Butler('/projects/MERIAN/repo/')
+
+    dataId = dict(tract=tract, band=band, skymap=skymap)
+    
+    deepCoadd_ref_patches = set([item.dataId["patch"] for item in 
+                                butler.registry.queryDatasets('deepCoadd_ref', 
+                                dataId=dataId, collections=output_collection,
+                                skymap=skymap)])
+
+    deepCoadd_meas_patches = set([item.dataId["patch"] for item in 
+                                butler.registry.queryDatasets('deepCoadd_meas', 
+                                dataId=dataId, collections=output_collection,
+                                skymap=skymap)])
+
+    deepCoadd_scarletModelData_patches = set([item.dataId["patch"] for item in 
+                                butler.registry.queryDatasets('deepCoadd_scarletModelData', 
+                                dataId=dataId, collections=output_collection,
+                                skymap=skymap)])
+
+    deepCoadd_calexp_patches = set([item.dataId["patch"] for item in 
+                                butler.registry.queryDatasets('deepCoadd_calexp', 
+                                dataId=dataId, collections=output_collection,
+                                skymap=skymap)])
+
+    del butler
+
+    patches = deepCoadd_ref_patches.intersection(deepCoadd_meas_patches, 
+                                                deepCoadd_scarletModelData_patches, 
+                                                deepCoadd_calexp_patches)
+    return(np.array(list(patches)))
