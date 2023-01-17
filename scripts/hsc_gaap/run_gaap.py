@@ -18,7 +18,7 @@ mp.freeze_support()
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-from hsc_gaap.gaap import GaapTask, NaiveLogger
+from hsc_gaap.gaap import GaapTask, NaiveLogger, findReducedPatches
 import lsst.daf.butler as dafButler
 
 
@@ -29,18 +29,16 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
 
     print("Starting butler")
     merian_butler = dafButler.Butler("/projects/MERIAN/repo")
-    merian_patches = [item.dataId['patch'] for item in merian_butler.registry.queryDatasets('objectTable',
-                                                                                     dataId=dict(tract=tract), collections='DECam/runs/merian/dr1_wide',
-                                                                                     instrument='DECam',
-                                                                                     skymap='hsc_rings_v1')]
-    merian_patches = np.unique(merian_patches)
-    # merian_patches = [int(name) for name in os.listdir(
-    #     f"/projects/MERIAN/repo/DECam/runs/merian/dr1_wide/20220921T193246Z/deepCoadd_forced_src/{tract}")]
+    merian_patches = findReducedPatches(tract)
     common_patches = np.intersect1d(new_patches, merian_patches)
     logger.info(
         f'In tract = {tract}, there are {len(common_patches)} common patches')
 
-    filter_pool = mp.Pool(filter_jobs)
+    if filter_jobs is not None:
+        filter_pool = mp.Pool(filter_jobs)
+    else:
+        filter_pool=None
+        
     try:
         if patch not in common_patches:
             if logger is not None:
@@ -157,9 +155,17 @@ def matchBlendedness(tract, patch_cols, patch_rows, repo='/projects/MERIAN/repo/
         gaapCat_dir = os.path.join(
             repo, "S20A/gaapTable/", f"{tract}", f"{patch[0]},{patch[1]}")
         gaapCat_file = f"objectTable_{tract}_{patch[0]},{patch[1]}_S20A.fits"
+        blendCat_file = f"S20A_blendedness_{patch[0]},{patch[1]}.fits"
+        
+        if not os.path.isfile(os.path.join(gaapCat_dir, gaapCat_file)):
+            raise ValueError(f"No gaap catalog at {os.path.join(gaapCat_dir, gaapCat_file)}")
+
+        if not os.path.isfile(os.path.join(gaapCat_dir, gaapCat_file)):
+             raise ValueError(f"No blendedness catalog at {os.path.join(gaapCat_dir, blendCat_file)}")
+
         gaapCat = Table.read(os.path.join(gaapCat_dir, gaapCat_file))
         blendCat = Table.read(os.path.join(
-            gaapCat_dir, f"S20A_blendedness_{patch[0]},{patch[1]}.fits"))
+            gaapCat_dir, blendCat_file))
 
         old_cols = [f'm_{filt}_blendedness_abs' for filt in 'grizy'] + \
             [f'm_{filt}_blendedness_flag' for filt in 'grizy']

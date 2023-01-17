@@ -1,9 +1,11 @@
-import os
+import os, sys
 import fire
 import numpy as np
 import lsst.daf.butler as dafButler
 from unagi import hsc
 s20a = hsc.Hsc(dr='dr3', rerun='s20a_wide')
+sys.path.append(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/'))
+from hsc_gaap.gaap import findReducedPatches
 
 def download_hsc_coadd(tract=9813, patch='8,6', filt='i', outdir='/projects/MERIAN/repo/'):
     outdir = os.path.join(outdir, 'S20A/deepCoadd_calexp', str(tract), str(patch))
@@ -62,16 +64,7 @@ def runDownload(tract=9813, outdir='/projects/MERIAN/repo/', only_merian=True, a
         return()   
 
     if only_merian:
-        output_collection = "DECam/runs/merian/dr1_wide"
-        data_type = "deepCoadd_calexp"
-        skymap = "hsc_rings_v1"
-        butler = dafButler.Butler('/projects/MERIAN/repo/', collections=output_collection, skymap=skymap)
-
-        patches = np.array([[data_id['tract'], data_id["patch"]] for data_id in butler.registry.queryDataIds (['tract','patch'], datasets=data_type, 
-                                                        collections=output_collection, skymap=skymap)])
-        patches = patches[patches[:, 0].argsort()]
-        del butler 
-        patches = np.unique(patches[patches[:,0] == tract][:,1])
+        patches = findReducedPatches(tract)
         patches = [[p % 9, int(p/9)] for p in patches]
 
     else:
@@ -88,7 +81,8 @@ def runDownload(tract=9813, outdir='/projects/MERIAN/repo/', only_merian=True, a
                 print(e)
                 print('Failed for tract = ', tract, ' patch = ',
                       f'{i},{j}', ' filter = ', filt)
-        download_blendedness(tract=tract, patch=f'{i},{j}', save=True, outdir=outdir)
+        if not os.path.isfile(os.path.join(outdir, f'S20A/gaapTable/{tract}/{i},{j}/S20A_blendedness_{i},{j}.fits')):
+            download_blendedness(tract=tract, patch=f'{i},{j}', save=True, outdir=outdir)
 
     print('Finished for tract = ', tract)
 

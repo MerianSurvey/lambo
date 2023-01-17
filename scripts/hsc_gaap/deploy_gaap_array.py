@@ -6,6 +6,9 @@ import sys
 import fire
 import numpy as np
 import lsst.daf.butler as dafButler
+sys.path.append(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/'))
+from hsc_gaap.gaap import findReducedPatches
+
 
 def deploy_training_job(tract, filter_jobs=5,
                         python_file='lambo/scripts/hsc_gaap/run_gaap.py',
@@ -15,27 +18,15 @@ def deploy_training_job(tract, filter_jobs=5,
     ''' Create slurm script to process all patches already reduced in Merian for a given tract.
     '''
 
-    # Get a list of reduced patches for a given tract
-
-    output_collection = "DECam/runs/merian/dr1_wide"
-    data_type = "deepCoadd_calexp"
-    skymap = "hsc_rings_v1"
-
-    butler = dafButler.Butler('/projects/MERIAN/repo/', collections=output_collection, skymap=skymap)
-    
-    patches = np.array([[data_id['tract'], data_id["patch"]] for data_id in butler.registry.queryDataIds (['tract','patch'], datasets=data_type, 
-                                                    collections=output_collection, skymap=skymap)])
-    patches = patches[patches[:, 0].argsort()]
-    del butler 
-
-    patches = np.unique(patches[patches[:,0] == tract][:,1])
+    # Get a list of reduced patches for a given tract  
+    patches = findReducedPatches(tract)
 
     time = "1:30:00"
     # name = name
     python_file = os.path.join(os.getenv("LAMBO_HOME"), python_file)
     cntnt = '\n'.join([
         "#!/bin/bash",
-        f"#SBATCH -J {name}_array_{tract}",
+        f"#SBATCH -J {tract}_gaapCosmos",
         "#SBATCH --nodes=1",
         f"#SBATCH --ntasks-per-node={filter_jobs+1}",  # {njobs}
         f"#SBATCH --mem={int(filter_jobs * 10)}G",
