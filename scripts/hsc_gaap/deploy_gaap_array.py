@@ -8,18 +8,21 @@ import numpy as np
 import lsst.daf.butler as dafButler
 sys.path.append(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/'))
 from hsc_gaap.gaap import findReducedPatches
-
+from hsc_gaap.check_gaap_run import checkRun
 
 def deploy_training_job(tract, filter_jobs=5,
                         python_file='lambo/scripts/hsc_gaap/run_gaap.py',
                         name='gaapCosmos', multijobs=False, email="am2907@princeton.edu", outname = None, 
-                        repo='/projects/MERIAN/repo/', submit=False):
+                        repo='/projects/MERIAN/repo/', submit=False, fixpatches=False):
         
     ''' Create slurm script to process all patches already reduced in Merian for a given tract.
     '''
 
     # Get a list of reduced patches for a given tract  
-    patches = findReducedPatches(tract)
+    if not fixpatches:
+        patches = findReducedPatches(tract)
+    else:
+        patches = checkRun(tract, repo=repo, output=False)
 
     time = "1:30:00"
     # name = name
@@ -56,7 +59,9 @@ def deploy_training_job(tract, filter_jobs=5,
 
     # create the slurm script execute it and remove it
     if outname is None:
-        outname = tract
+        outname = str(tract)
+        if fixpatches:
+            outname += "_fixing"
     if not os.path.isdir('./slurmscripts'):
         os.mkdir("./slurmscripts")
     if not os.path.isdir(f'./log/{tract}'):
