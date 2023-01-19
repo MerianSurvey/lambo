@@ -161,12 +161,21 @@ class GaapTask(object):
         Check if HSC S20A data for the given tract and patch exist.
         """
         self.filenames = {}
+        foundbands = ""
         for band in self.bands:
             self.filenames[band] = os.path.join(self.repo, self.collections, str(self.tract), str(self.patch_old),
                                                 f'calexp-HSC-{band.upper()}-{self.tract}-{self.patch_old}.fits')
-            if not os.path.isfile(self.filenames[band]):
-                raise FileNotFoundError(
-                    f'File {self.filenames[band]} not found')
+            if os.path.isfile(self.filenames[band]):
+                foundbands += band
+        notfoundbands = self.bands.replace(foundbands, "")
+
+        if foundbands == "":       
+            raise FileNotFoundError(
+                f'File {self.filenames[notfoundbands[0]]} not found for all filters')
+        elif foundbands != self.bands:
+            print(f'File {self.filenames[notfoundbands[0]]} not found for filters {notfoundbands}')
+            print(f'Running GAaP only on filters {foundbands}')
+            self.bands = foundbands
 
     def load_merian_reference(self, band='N708', repo='/projects/MERIAN/repo/',
                               collections='DECam/runs/merian/dr1_wide', range=None):
@@ -321,9 +330,11 @@ class GaapTask(object):
             if self.logger is not None:
                 self.logger.debug(
                     'Running ForcedPhotCoaddTask on all bands using multiprocessing')
-            pool.map(self.run, self.bands)
+            successbands = pool.map(self.run, self.bands)
             pool.close()
             pool.join()
+            self.bands = "".join(successbands)
+            
         else:
             for band in self.bands:
                 self.run(band)
@@ -343,29 +354,36 @@ class GaapTask(object):
 
         logger.info(
             f'    - Patch {self.patch}: Generating ForcedPhotCoadd catalog for {band} band')
-        measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.exposureDataId,
-                                                          exposure=self.exposures[band],
-                                                          refCat=self.refCat,
-                                                          refCatInBand=self.refCatInBand,
-                                                          refWcs=self.refExposure.wcs,
-                                                          idPackerName='tract_patch',
-                                                          footprintData=self.footprintCatInBand)
-        logger.info(
-            f'    - Patch {self.patch}: Running ForcedPhotCoaddTask on {band} band')
-        print(
-            f"# Starting the GAaP measureTask for patch={self.patch}, band={band} at", time.ctime())
-        t1 = time.time()
-        measureTask.run(measCat,
-                        self.exposures[band],
-                        refCat=self.refCat,
-                        refWcs=self.refExposure.wcs,
-                        exposureId=exposureID)
-        t2 = time.time()
-        logger.info(
-            f'    - Patch {self.patch}: band {band}, Finished ForcedPhotCoaddTask in {(t2 - t1):.2f} seconds')
-        print(
-            f"# Finished the GAaP measureTask for band {band} in %.2f seconds." % (t2 - t1))
-        self.forcedSrcCats[band] = measCat
+        try:
+            measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.exposureDataId,
+                                                            exposure=self.exposures[band],
+                                                            refCat=self.refCat,
+                                                            refCatInBand=self.refCatInBand,
+                                                            refWcs=self.refExposure.wcs,
+                                                            idPackerName='tract_patch',
+                                                            footprintData=self.footprintCatInBand)
+            logger.info(
+                f'    - Patch {self.patch}: Running ForcedPhotCoaddTask on {band} band')
+            print(
+                f"# Starting the GAaP measureTask for patch={self.patch}, band={band} at", time.ctime())
+            t1 = time.time()
+            measureTask.run(measCat,
+                            self.exposures[band],
+                            refCat=self.refCat,
+                            refWcs=self.refExposure.wcs,
+                            exposureId=exposureID)
+            t2 = time.time()
+            logger.info(
+                f'    - Patch {self.patch}: band {band}, Finished ForcedPhotCoaddTask in {(t2 - t1):.2f} seconds')
+            print(
+                f"# Finished the GAaP measureTask for band {band} in %.2f seconds." % (t2 - t1))
+            self.forcedSrcCats[band] = measCat
+            return(band)
+        except Exception as err:
+            print(err)
+            logger.error(f'    - Patch {self.patch}: ForcedPhotCoaddTask FAILED on {band} band')
+            print(f"# ERROR: GAaP measureTask FAILED for band {band}")
+            return("")
 
     def writeObjectTable(self):
         """

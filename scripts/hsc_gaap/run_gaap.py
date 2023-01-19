@@ -33,11 +33,6 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
     common_patches = np.intersect1d(new_patches, merian_patches)
     logger.info(
         f'In tract = {tract}, there are {len(common_patches)} common patches')
-
-    if filter_jobs is not None:
-        filter_pool = mp.Pool(filter_jobs)
-    else:
-        filter_pool=None
         
     try:
         if patch not in common_patches:
@@ -54,7 +49,6 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
                             repo=repo,
                             collections='S20A/deepCoadd_calexp',
                             logger=logger, merian_butler=merian_butler)
-            gaap._checkHSCfile()
         elif hsc_type == 'w_2022_40':
             gaap = GaapTask(tract, patch, bands, hsc_type='w_2022_40',
                             repo=repo,
@@ -72,7 +66,14 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
                                    )
         del merian_butler
         gaap.setDefaultMeasureConfig()
+
+        if filter_jobs is not None:
+            filter_pool = mp.Pool(min(len(gaap.bands), filter_jobs))
+        else:
+            filter_pool=None
+
         gaap.runAll(filter_pool)
+        print(f'BANDS TO WRITE: {gaap.bands}')
         gaap.writeObjectTable()
         gaap.transformObjectCatalog(
             functorFile=os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/Object.yaml'))
@@ -106,6 +107,8 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
     """
     if os.path.isdir(f'./log/{tract}') is False:
         os.makedirs(f'./log/{tract}')
+    if os.path.isfile(f'./log/{tract}//{patch_cols[0] + patch_rows[0] * 9}.log'):
+        os.system(f'rm ./log/{tract}//{patch_cols[0] + patch_rows[0] * 9}.log')
     logger = NaiveLogger(f'./log/{tract}/{patch_cols[0] + patch_rows[0] * 9}.log')
     patches_old = list(product(patch_cols, patch_rows))
     patches = [item[0] + item[1] * 9 for item in patches_old]
@@ -144,7 +147,7 @@ def matchBlendedness(tract, patch_cols, patch_rows, repo='/projects/MERIAN/repo/
     matchdist : float
         Maximum matching distance in arcseconds
     matchmag : float.
-        Maximum 3-pixel-aperture g-band flux difference for matching.
+        Maximum 3-pixel-aperture flux difference for matching.
 
     """
     patches = list(product(patch_cols, patch_rows))
@@ -181,15 +184,18 @@ def matchBlendedness(tract, patch_cols, patch_rows, repo='/projects/MERIAN/repo/
         _blend = SkyCoord(blendCat['ra'], blendCat['dec'], unit='deg')
         ind, dist, _ = _gaap.match_to_catalog_sky(_blend)
 
+        match_flux_col = np.array(gaapCat.colnames)[["ap03Flux" in col for col in gaapCat.colnames]][0]
+    
         match = (dist < .5 * u.arcsec) & (
-            abs(gaapCat["g_ap03Flux"] - blendCat["g_apertureflux10_S20A"][ind]) < 10)
+            abs(gaapCat[match_flux_col] - blendCat["g_apertureflux10_S20A"][ind]) < 10)
 
         for col in new_cols:
             gaapCat[col] = np.ones(len(gaapCat)) * np.nan
             gaapCat[col][match] = blendCat[ind[match]][col]
 
         gaapCat.write(os.path.join(gaapCat_dir, gaapCat_file), overwrite=True)
-        print('Matched GAaP table with S20A blendedness.')
+        print(f'Matched GAaP table with S20A blendedness based on {match_flux_col[0]} band.')
+
 
 
 if __name__ == '__main__':
