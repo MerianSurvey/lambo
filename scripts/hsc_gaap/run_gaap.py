@@ -73,7 +73,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
             filter_pool=None
 
         gaap.runAll(filter_pool)
-        print(f'BANDS TO WRITE: {gaap.bands}')
+        print(f'BANDS WRITING TO CATALOG: {gaap.bands}')
         gaap.writeObjectTable()
         gaap.transformObjectCatalog(
             functorFile=os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/Object.yaml'))

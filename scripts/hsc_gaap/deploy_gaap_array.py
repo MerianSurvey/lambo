@@ -12,7 +12,7 @@ from hsc_gaap.check_gaap_run import checkRun
 
 def deploy_training_job(tract, filter_jobs=5,
                         python_file='lambo/scripts/hsc_gaap/run_gaap.py',
-                        name='gaapCosmos', multijobs=False, email="am2907@princeton.edu", outname = None, 
+                        name='gaap', email="am2907@princeton.edu", outname = None, 
                         repo='/projects/MERIAN/repo/', submit=False, fixpatches=False):
         
     ''' Create slurm script to process all patches already reduced in Merian for a given tract.
@@ -29,10 +29,10 @@ def deploy_training_job(tract, filter_jobs=5,
     python_file = os.path.join(os.getenv("LAMBO_HOME"), python_file)
     cntnt = '\n'.join([
         "#!/bin/bash",
-        f"#SBATCH -J {tract}_gaapCosmos",
+        f"#SBATCH -J {tract}_{name}",
         "#SBATCH --nodes=1",
         f"#SBATCH --ntasks-per-node={filter_jobs+1}",  # {njobs}
-        f"#SBATCH --mem={int(filter_jobs * 10)}G",
+        f"#SBATCH --mem={int(filter_jobs * 5)}G",
         "#SBATCH --time=%s" % time,
         f"#SBATCH --array={','.join(patches.astype(str))}",
         "#SBATCH --export=ALL",

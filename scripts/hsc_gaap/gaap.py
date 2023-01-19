@@ -57,6 +57,7 @@ import lsst.meas.base.sdssCentroid
 import lsst.meas.base.peakLikelihoodFlux
 import lsst.meas.modelfit.cmodel.cmodel
 import lsst.meas.base.gaussianFlux
+from lsst.geom import Box2I, Extent2I, Point2I, Point2D
 
 # Write catalog
 from lsst.pipe.tasks.postprocess import WriteObjectTableTask, TransformObjectCatalogTask, TransformObjectCatalogConfig
@@ -354,37 +355,50 @@ class GaapTask(object):
 
         logger.info(
             f'    - Patch {self.patch}: Generating ForcedPhotCoadd catalog for {band} band')
-        try:
-            measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.exposureDataId,
-                                                            exposure=self.exposures[band],
-                                                            refCat=self.refCat,
-                                                            refCatInBand=self.refCatInBand,
-                                                            refWcs=self.refExposure.wcs,
-                                                            idPackerName='tract_patch',
-                                                            footprintData=self.footprintCatInBand)
-            logger.info(
-                f'    - Patch {self.patch}: Running ForcedPhotCoaddTask on {band} band')
-            print(
-                f"# Starting the GAaP measureTask for patch={self.patch}, band={band} at", time.ctime())
-            t1 = time.time()
-            measureTask.run(measCat,
-                            self.exposures[band],
-                            refCat=self.refCat,
-                            refWcs=self.refExposure.wcs,
-                            exposureId=exposureID)
-            t2 = time.time()
-            logger.info(
-                f'    - Patch {self.patch}: band {band}, Finished ForcedPhotCoaddTask in {(t2 - t1):.2f} seconds')
-            print(
-                f"# Finished the GAaP measureTask for band {band} in %.2f seconds." % (t2 - t1))
-            self.forcedSrcCats[band] = measCat
-            return(band)
-        except Exception as err:
-            print(err)
-            logger.error(f'    - Patch {self.patch}: ForcedPhotCoaddTask FAILED on {band} band')
-            print(f"# ERROR: GAaP measureTask FAILED for band {band}")
-            return("")
+        
+        # Get rid of parents that will crash the photometry because
+        # Scarlet doesn't deal properly with weird patches in images
+        catalog = measureTask.measurement.generateMeasCat(self.exposures[band], self.refCat, self.refExposure.wcs)
+        parents = catalog[catalog["parent"] == 0]
+        for parent in parents:
+            parentId = parent.getId()
+            try:
+                self.footprintCatInBand.blends[parentId]   
+                try:
+                    position = Point2D(self.footprintCatInBand.blends[parentId].psfCenter)
+                    self.exposures[band].getPsf().computeKernelImage(position).array[None, :, :]
+                except:
+                    del self.footprintCatInBand.blends[parentId]   
 
+            except:
+                continue
+
+
+        measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.exposureDataId,
+                                                        exposure=self.exposures[band],
+                                                        refCat=self.refCat,
+                                                        refCatInBand=self.refCatInBand,
+                                                        refWcs=self.refExposure.wcs,
+                                                        idPackerName='tract_patch',
+                                                        footprintData=self.footprintCatInBand)
+        logger.info(
+            f'    - Patch {self.patch}: Running ForcedPhotCoaddTask on {band} band')
+        print(
+            f"# Starting the GAaP measureTask for patch={self.patch}, band={band} at", time.ctime())
+        t1 = time.time()
+        measureTask.run(measCat,
+                        self.exposures[band],
+                        refCat=self.refCat,
+                        refWcs=self.refExposure.wcs,
+                        exposureId=exposureID)
+        t2 = time.time()
+        logger.info(
+        f'    - Patch {self.patch}: band {band}, Finished ForcedPhotCoaddTask in {(t2 - t1):.2f} seconds')
+        print(
+            f"# Finished the GAaP measureTask for band {band} in %.2f seconds." % (t2 - t1))
+        self.forcedSrcCats[band] = measCat
+        return(band)
+        
     def writeObjectTable(self):
         """
         This step turns the ``measCat`` (which is effectively ``deepCoadd_forced_src``) into a ``deepCoadd_obj`` table, 
