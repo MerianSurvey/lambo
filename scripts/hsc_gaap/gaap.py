@@ -373,7 +373,6 @@ class GaapTask(object):
             except:
                 continue
 
-
         measCat, exposureID = measureTask.generateMeasCat(exposureDataId=self.exposureDataId,
                                                         exposure=self.exposures[band],
                                                         refCat=self.refCat,
