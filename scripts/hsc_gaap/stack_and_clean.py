@@ -7,7 +7,8 @@ def saveTractTable(tract, repo="/scratch/gpfs/am2907/Merian/gaap/",  hsc_type = 
                    copy_to_projects=False, delete=False):
 
     """Stack and save all of the gaap catalogs for a given tract"""
-    stacked_tables = consolidateObjectTables(tract=tract, repo=repo)
+    stacked_tables = consolidateObjectTables(patches=[], tract=tract, repo=repo)
+    print("Stacked")
     filename = os.path.join(repo, f'{hsc_type}/gaapTable/{tract}/objectTable_{tract}_{hsc_type}.fits')
     if not delete:
          stacked_tables.write(filename, overWrite=True)
@@ -32,4 +33,4 @@ def stackAndClean(tract, stack=True, copy_to_projects=False, clean=False,
         os.system(f'rm -r {repo}/{hsc_type}/gaapTable/{tract}')
 
 if __name__ == '__main__':
-    fire.Fire(saveTractTable)
+    fire.Fire(stackAndClean)
