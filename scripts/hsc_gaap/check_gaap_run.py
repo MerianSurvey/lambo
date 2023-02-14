@@ -22,10 +22,17 @@ def checkRun(tract, repo = '/scratch/gpfs/am2907/Merian/gaap/', output=True):
 
     error1 = "Wrote GAaP table to "
     error2 = "Running GAaP only on filters"
-    error3 = "KeyError: 'g_ap03Flux'"
+    error3 = "Matched GAaP table with S20A blendedness"
+    error4 = "not found for all filters"
     for i, log in enumerate(logs):
         logfile = open(log, "r").read()
         
+        if error4 in logfile:
+            if output:
+                print(f'PROBLEM IN PATCH {logs_patches[i]}: Missing all filter images ')
+            problem_patches.append(logs_patches[i])
+            continue
+
         if error1 not in logfile:
             if output:
                 print (f'PROBLEM IN PATCH {logs_patches[i]}: Catalog not saved')
@@ -41,7 +48,7 @@ def checkRun(tract, repo = '/scratch/gpfs/am2907/Merian/gaap/', output=True):
                 print (f'PROBLEM IN PATCH {logs_patches[i]}: Failed for {5 - logfile.count("Finished the GAaP measureTask for band")} bands')
             problem_patches.append(logs_patches[i])
 
-        if error3 in logfile:
+        if error3 not in logfile:
             if output:
                 print (f'PROBLEM IN PATCH {logs_patches[i]}: Blend matching failed')
             problem_patches.append(logs_patches[i])
