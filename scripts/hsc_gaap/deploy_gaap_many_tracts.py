@@ -31,4 +31,4 @@ for tract in tracts:
     deploy_training_job(tract, filter_jobs=5,
                         python_file='lambo/scripts/hsc_gaap/run_gaap.py',
                         name='gaap', email="am2907@princeton.edu", outname = None, 
-                        repo='/scratch/gpfs/am2907/Merian/gaap', submit=True, fixpatches=False)
+                        repo='/scratch/gpfs/am2907/Merian/gaap', scriptdir=".", submit=True, fixpatches=False)

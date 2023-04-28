@@ -13,7 +13,7 @@ from hsc_gaap.check_gaap_run import checkRun
 def deploy_training_job(tract, filter_jobs=5,
                         python_file='lambo/scripts/hsc_gaap/run_gaap.py',
                         name='gaap', email="am2907@princeton.edu", outname = None, 
-                        repo='/projects/MERIAN/repo/', submit=False, fixpatches=False):
+                        repo='/projects/MERIAN/repo/', scriptdir = ".", submit=False, fixpatches=False):
         
     ''' Create slurm script to process all patches already reduced in Merian for a given tract.
     '''
@@ -36,7 +36,7 @@ def deploy_training_job(tract, filter_jobs=5,
         "#SBATCH --time=%s" % time,
         f"#SBATCH --array={','.join(patches.astype(str))}",
         "#SBATCH --export=ALL",
-        f"#SBATCH -o ./log/{tract}/%a.o",
+        f"#SBATCH -o {scriptdir}/log/{tract}/%a.o",
         "#SBATCH --mail-type=all",
         f"#SBATCH --mail-user={email}",
         "",
@@ -62,15 +62,15 @@ def deploy_training_job(tract, filter_jobs=5,
         outname = str(tract)
         if fixpatches:
             outname += "_fixing"
-    if not os.path.isdir('./slurmscripts'):
-        os.mkdir("./slurmscripts")
-    if not os.path.isdir(f'./log/{tract}'):
-        os.makedirs(f'./log/{tract}')
-    f = open(f'slurmscripts/{outname}.slurm', 'w')
+    if not os.path.isdir(f'{scriptdir}/slurmscripts'):
+        os.mkdir(f"{scriptdir}/slurmscripts")
+    if not os.path.isdir(f'{scriptdir}/log/{tract}'):
+        os.makedirs(f'{scriptdir}/log/{tract}')
+    f = open(f'{scriptdir}/slurmscripts/{outname}.slurm', 'w')
     f.write(cntnt)
     f.close()
     if submit:
-        os.system(f'sbatch ./slurmscripts/{outname}.slurm')
+        os.system(f'sbatch {scriptdir}/slurmscripts/{outname}.slurm')
     return None
     
 if __name__ == '__main__':
