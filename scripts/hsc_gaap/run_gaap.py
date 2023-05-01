@@ -90,7 +90,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
         print(traceback.format_exc())
 
 
-def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, hsc_type='S20A', repo='/projects/MERIAN/repo/'):
+def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, hsc_type='S20A', repo='/projects/MERIAN/repo/', logdir="."):
     """
     This function uses ``multiprocessing`` to run ``runGaap`` in parallel.
     The "parallel" is in the sense that the patches are processed in parallel, not the bands.
@@ -105,11 +105,12 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
         The row numbers of the patches to be processed, following the old patch pattern.
 
     """
-    if os.path.isdir(f'./log/{tract}') is False:
-        os.makedirs(f'./log/{tract}')
-    if os.path.isfile(f'./log/{tract}//{patch_cols[0] + patch_rows[0] * 9}.log'):
-        os.system(f'rm ./log/{tract}//{patch_cols[0] + patch_rows[0] * 9}.log')
-    logger = NaiveLogger(f'./log/{tract}/{patch_cols[0] + patch_rows[0] * 9}.log')
+
+    if os.path.isdir(f'{logdir}/log/{tract}') is False:
+        os.makedirs(f'{logdir}/log/{tract}')
+    if os.path.isfile(f'{logdir}/log/{tract}/{patch_cols[0] + patch_rows[0] * 9}.log'):
+        os.system(f'rm {logdir}/log/{tract}/{patch_cols[0] + patch_rows[0] * 9}.log')
+    logger = NaiveLogger(f'{logdir}/log/{tract}/{patch_cols[0] + patch_rows[0] * 9}.log')
     patches_old = list(product(patch_cols, patch_rows))
     patches = [item[0] + item[1] * 9 for item in patches_old]
 

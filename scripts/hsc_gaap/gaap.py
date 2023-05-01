@@ -447,7 +447,7 @@ class GaapTask(object):
             transConfig.functorFile = functorFile
         with suppress(NotImplementedError):
             transTask = TransformObjectCatalogTask(config=transConfig)
-            transTask.funcs.log.setLevel('FATAL')
+            transTask.log.setLevel('FATAL')
             self.objectTable = transTask.run(parq)
 
         if self.logger is not None:

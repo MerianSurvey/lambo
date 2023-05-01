@@ -61,7 +61,12 @@ def runDownload(tract=9813, outdir='/projects/MERIAN/repo/', only_merian=True, a
 
         for t in tracts:
             runDownload(tract=t, outdir=outdir, only_merian=only_merian, alltracts=False)
-        return()   
+        return()
+
+    if type(tract) is list:
+        for t in tract:
+            runDownload(tract=t, outdir=outdir, only_merian=only_merian, alltracts=False)
+        return()
 
     if only_merian:
         patches = findReducedPatches(tract)
