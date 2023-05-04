@@ -175,10 +175,14 @@ def matchBlendedness(tract, patch_cols, patch_rows, repo='/projects/MERIAN/repo/
             [f'm_{filt}_blendedness_flag' for filt in 'grizy']
         old_cols += [f'{filt}_apertureflux_10_flux' for filt in 'grizy'] + \
             [f'{filt}_apertureflux_10_flag' for filt in 'grizy']
-        new_cols = [f'{filt}_blendedness' for filt in 'grizy'] + \
+        old_cols += [f'{filt}_extendedness_value' for filt in 'grizy']
+    
+        new_cols = [f'{filt}_blendedness_HSC_S20A' for filt in 'grizy'] + \
             [f'{filt}_blendedness_flag' for filt in 'grizy']
-        new_cols += [f'{filt}_apertureflux10_S20A' for filt in 'grizy'] + \
-            [f'{filt}_apertureflux10_flag_S20A' for filt in 'grizy']
+        new_cols += [f'{filt}_apertureflux10_HSC_S20A' for filt in 'grizy'] + \
+            [f'{filt}_apertureflux10_flag_HSC_S20A for filt in 'grizy']
+        new_cols += [f'{filt}_extendedness_value_HSC_S20A' for filt in 'grizy']
+        
         blendCat.rename_columns(old_cols, new_cols)
 
         _gaap = SkyCoord(gaapCat['coord_ra'], gaapCat['coord_dec'], unit='deg')
