@@ -63,10 +63,10 @@ def hasCompiledCatalog(tract, repo='/scratch/gpfs/am2907/Merian/gaap'):
          return(False)
 
 
-def saveMerianReducedPatchList(tracts, outfile):
+def saveMerianReducedPatchList(tracts, outfile, band="N708"):
      f = open(outfile, "w")
      for tract in tracts:
-        patches = ",".join(findReducedPatches(tract).astype(str))
+        patches = ",".join(findReducedPatches(tract, band=band).astype(str))
         if len(patches) > 0:
             f.write(f'{tract},{patches}\n')
      f.close()
@@ -83,21 +83,24 @@ def saveGaapReducedPatchList(tracts, outfile):
      print(f"Saved file to {outfile}.")
 
 
-def saveGaapNotReducedPatchList(tracts, outfile, notionformat=False):
+def saveGaapNotReducedPatchList(tracts, outfile, patches = [], band="N708", notionformat=False):
      f = open(outfile, "w")
      if notionformat:
-         f.write("Tract,Tract #,# patches\n")
+         f.write("Tract,Tract #,# patches,Band\n")
 
      for tract in tracts:
-        patches_mer  = findReducedPatches(tract)
+        if len(patches) ==0 :
+            patches_mer  = findReducedPatches(tract, band=band)
+        else:
+            patches_mer = patches[np.where(tracts==tract)[0][0]]
         patches_gaap = findGaapReducedPatches(tract)
-        patches = np.array(list(set(patches_mer) - set(patches_gaap)))
-        npatches = len(patches)
-        patches = ",".join(patches.astype(str))
+        patches_i = np.array(list(set(patches_mer) - set(patches_gaap)))
+        npatches = len(patches_i)
+        patches_i = ",".join(patches_i.astype(str))
         if npatches > 0:
             if not notionformat:
-                f.write(f'{tract},{patches}\n')
+                f.write(f'{tract},{patches_i}\n')
             else:
-                f.write(f'{tract},{tract},{npatches}\n')
+                f.write(f'{tract},{tract},{npatches},{band}\n')
      f.close()
      print(f"Saved file to {outfile}.")

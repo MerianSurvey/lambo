@@ -22,7 +22,8 @@ from hsc_gaap.gaap import GaapTask, NaiveLogger, findReducedPatches
 import lsst.daf.butler as dafButler
 
 
-def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, filter_jobs=None, repo='/projects/MERIAN/repo/'):
+def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, filter_jobs=None, 
+            repo='/projects/MERIAN/repo/', mer_band = "N708"):
     old_patches = [name for name in os.listdir(
         f"{repo}/S20A/deepCoadd_calexp/{tract}/")]
     new_patches = [int(name[0]) + int(name[2]) * 9 for name in old_patches]
@@ -60,7 +61,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
                             collections='HSC/runs/RC2/w_2022_04/DM-33402',
                             logger=logger)
 
-        gaap.load_merian_reference(band='N708',
+        gaap.load_merian_reference(band=mer_band,
                                    repo='/projects/MERIAN/repo/',
                                    collections='DECam/runs/merian/dr1_wide'
                                    )
@@ -90,7 +91,8 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
         print(traceback.format_exc())
 
 
-def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, hsc_type='S20A', repo='/projects/MERIAN/repo/', logdir="."):
+def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, 
+                     hsc_type='S20A', repo='/projects/MERIAN/repo/', logdir=".", mer_band = "N708"):
     """
     This function uses ``multiprocessing`` to run ``runGaap`` in parallel.
     The "parallel" is in the sense that the patches are processed in parallel, not the bands.
@@ -129,7 +131,7 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
         if filter_jobs is not None:
             print('Using filter pool: ', filter_jobs, 'jobs')
 
-        runGaap(patch, tract, bands=bands,
+        runGaap(patch, tract, bands=bands, mer_band=mer_band,
                 hsc_type=hsc_type, logger=logger, filter_jobs=filter_jobs, repo=repo)
 
         # matchBlendedness(tract, patch_cols, patch_rows, repo=repo)
