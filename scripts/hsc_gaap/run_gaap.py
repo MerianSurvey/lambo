@@ -132,7 +132,7 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
         runGaap(patch, tract, bands=bands,
                 hsc_type=hsc_type, logger=logger, filter_jobs=filter_jobs, repo=repo)
 
-        matchBlendedness(tract, patch_cols, patch_rows, repo=repo)
+        # matchBlendedness(tract, patch_cols, patch_rows, repo=repo)
 
         gc.collect()
 
