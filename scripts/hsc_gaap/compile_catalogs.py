@@ -65,7 +65,10 @@ def compileCatalogs(tracts, repo= "/scratch/gpfs/am2907/Merian/gaap/", alltracts
 
             assert np.all(merian['objectId'] == gaapTable['objectId']) , "GAaP table does not match Merian table!"
             gaapTable.remove_columns(["objectId", "coord_ra", "coord_dec", "ebv"])
-            tableList.append(hstack([merian, gaapTable]))
+            
+            stack_table = hstack([merian, gaapTable])
+            unique_flag = (merian['detect_isPrimary']==True) #Select unique objects using detect_isPrimary
+            tableList.append(stack_table[unique_flag])
 
         if len (tableList) == 0:
             continue
