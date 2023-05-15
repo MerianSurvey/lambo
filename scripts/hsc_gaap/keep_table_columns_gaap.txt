@@ -4,7 +4,6 @@ coord_dec
 ebv
 g_gaap1p0Flux
 g_gaap1p0FluxErr
-g_blendedness
 g_gaapOptimalFlux
 g_gaapOptimalFluxErr
 g_cModelFlux
@@ -13,7 +12,6 @@ g_cModelFlux_inner
 g_cModel_flag
 r_gaap1p0Flux
 r_gaap1p0FluxErr
-r_blendedness
 r_gaapOptimalFlux
 r_gaapOptimalFluxErr
 r_cModelFlux
@@ -22,7 +20,6 @@ r_cModelFlux_inner
 r_cModel_flag
 i_gaap1p0Flux
 i_gaap1p0FluxErr
-i_blendedness
 i_gaapOptimalFlux
 i_gaapOptimalFluxErr
 i_cModelFlux
@@ -31,7 +28,6 @@ i_cModelFlux_inner
 i_cModel_flag
 z_gaap1p0Flux
 z_gaap1p0FluxErr
-z_blendedness
 z_gaapOptimalFlux
 z_gaapOptimalFluxErr
 z_cModelFlux
@@ -40,7 +36,6 @@ z_cModelFlux_inner
 z_cModel_flag
 y_gaap1p0Flux
 y_gaap1p0FluxErr
-y_blendedness
 y_gaapOptimalFlux
 y_gaapOptimalFluxErr
 y_cModelFlux
