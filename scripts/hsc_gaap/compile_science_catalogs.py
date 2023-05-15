@@ -8,9 +8,14 @@ from hsc_gaap.gaap import findReducedPatches, consolidateMerianCats
 
 import fire
 
-def compileCatalogs(tracts, repo= "/scratch/gpfs/am2907/Merian/gaap/", alltracts=False, rewrite=False):
-    keepColumns_merian = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', "keep_table_columns_merian.txt"), dtype=None, encoding="ascii"))
-    keepColumns_gaap = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', "keep_table_columns_gaap.txt"), dtype=None, encoding="ascii"))
+keep_merian_file = 'keep_table_columns_merian.txt'
+keep_gaap_file = 'keep_table_columns_gaap.txt'
+repo = '/scratch/gpfs/am2907/Merian/gaap/'
+repo_out = '/scratch/gpfs/sd8758/merian/catalog/'
+
+def merge_merian_catalogs(tracts, repo=repo, alltracts=False, rewrite=False):
+    keepColumns_merian = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_merian_file), dtype=None, encoding="ascii"))
+    keepColumns_gaap = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_gaap_file), dtype=None, encoding="ascii"))
 
     if alltracts:
         tracts = glob.glob(os.path.join(repo, "log/*"))
@@ -65,7 +70,9 @@ def compileCatalogs(tracts, repo= "/scratch/gpfs/am2907/Merian/gaap/", alltracts
 
             assert np.all(merian['objectId'] == gaapTable['objectId']) , "GAaP table does not match Merian table!"
             gaapTable.remove_columns(["objectId", "coord_ra", "coord_dec", "ebv"])
-            tableList.append(hstack([merian, gaapTable]))
+            
+            stack_table = hstack([merian, gaapTable])
+            tableList.append()
 
         if len (tableList) == 0:
             continue
@@ -75,5 +82,28 @@ def compileCatalogs(tracts, repo= "/scratch/gpfs/am2907/Merian/gaap/", alltracts
         fullTable.write(outCatFile, overwrite=True)
         print(f"WROTE TABLE TO {outCatFile}")
 
+def select_unique_objs(tracts, repo=repo, alltracts=False):
+
+	for tract in tracts:
+		catDir = os.path.join(repo, f"S20A/gaapTable/{tract}/")
+		outCatFile = os.path.join(catDir, f'objectTable_{tract}_S20A.fits')
+
+		tractTable = Table.read(outCatFile)	
+		unique_flag = (tractTable['detect_isPrimary']==True) #Select unique objects using detect_isPrimary
+		tablePrimary = tractTable[unique_flag]
+		print(f"COMPILED TABLE OF UNIQUE SCIENCE OBJECTS WITH {len(tablePrimary)} ROWS and {len(tablePrimary.colnames)} COLUMNS")
+			
+		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
+		isExist = os.path.exists(outCatDir)
+		if not isExist:
+			os.makedirs(outCatDir)
+
+		outSciCatFile = os.path.join(outCatDir, f'SciObjectTable_{tract}_S20A.fits') 
+		tablePrimary.write(outSciCatFile, overwrite=True)
+
 if __name__ == '__main__':
-    fire.Fire(compileCatalogs)
+    fire.Fire(merge_merian_catalogs)
+    fire.Fire(select_unique_objs)
+	
+	
+
