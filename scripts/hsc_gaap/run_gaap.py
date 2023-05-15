@@ -18,7 +18,8 @@ mp.freeze_support()
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-from hsc_gaap.gaap import GaapTask, NaiveLogger, findReducedPatches
+from hsc_gaap.gaap import GaapTask, NaiveLogger
+from hsc_gaap.find_patches_to_reduce import findReducedPatches
 import lsst.daf.butler as dafButler
 
 
@@ -30,7 +31,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
 
     print("Starting butler")
     merian_butler = dafButler.Butler("/projects/MERIAN/repo")
-    merian_patches = findReducedPatches(tract)
+    merian_patches = findReducedPatches(tract, band=mer_band)
     common_patches = np.intersect1d(new_patches, merian_patches)
     logger.info(
         f'In tract = {tract}, there are {len(common_patches)} common patches')
