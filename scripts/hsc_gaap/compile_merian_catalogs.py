@@ -1,11 +1,6 @@
 import os, sys
-import glob
-import numpy as np
 sys.path.append(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/'))
-from astropy.table import Table, vstack, hstack
-import lsst.daf.butler as dafButler
-from hsc_gaap.gaap import findReducedPatches, consolidateMerianCats
-from hsc_gaap.compile_catalogs import merge_merian_catalogs
+from hsc_gaap.compile_science_catalogs import merge_merian_catalogs
 import fire
 
 

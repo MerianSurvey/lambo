@@ -18,18 +18,20 @@ mp.freeze_support()
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-from hsc_gaap.gaap import GaapTask, NaiveLogger, findReducedPatches
+from hsc_gaap.gaap import GaapTask, NaiveLogger
+from hsc_gaap.find_patches_to_reduce import findReducedPatches
 import lsst.daf.butler as dafButler
 
 
-def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, filter_jobs=None, repo='/projects/MERIAN/repo/'):
+def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, filter_jobs=None, 
+            repo='/projects/MERIAN/repo/', mer_band = "N708"):
     old_patches = [name for name in os.listdir(
         f"{repo}/S20A/deepCoadd_calexp/{tract}/")]
     new_patches = [int(name[0]) + int(name[2]) * 9 for name in old_patches]
 
     print("Starting butler")
     merian_butler = dafButler.Butler("/projects/MERIAN/repo")
-    merian_patches = findReducedPatches(tract)
+    merian_patches = findReducedPatches(tract, band=mer_band)
     common_patches = np.intersect1d(new_patches, merian_patches)
     logger.info(
         f'In tract = {tract}, there are {len(common_patches)} common patches')
@@ -60,7 +62,7 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
                             collections='HSC/runs/RC2/w_2022_04/DM-33402',
                             logger=logger)
 
-        gaap.load_merian_reference(band='N708',
+        gaap.load_merian_reference(band=mer_band,
                                    repo='/projects/MERIAN/repo/',
                                    collections='DECam/runs/merian/dr1_wide'
                                    )
@@ -90,7 +92,8 @@ def runGaap(patch, tract=9813, bands='gri', hsc_type='w_2022_40', logger=None, f
         print(traceback.format_exc())
 
 
-def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, hsc_type='S20A', repo='/projects/MERIAN/repo/', logdir="."):
+def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5, filter_jobs=None, 
+                     hsc_type='S20A', repo='/projects/MERIAN/repo/', logdir=".", mer_band = "N708"):
     """
     This function uses ``multiprocessing`` to run ``runGaap`` in parallel.
     The "parallel" is in the sense that the patches are processed in parallel, not the bands.
@@ -129,10 +132,10 @@ def runGaapRowColumn(tract, patch_cols, patch_rows, bands='grizy', patch_jobs=5,
         if filter_jobs is not None:
             print('Using filter pool: ', filter_jobs, 'jobs')
 
-        runGaap(patch, tract, bands=bands,
+        runGaap(patch, tract, bands=bands, mer_band=mer_band,
                 hsc_type=hsc_type, logger=logger, filter_jobs=filter_jobs, repo=repo)
 
-        matchBlendedness(tract, patch_cols, patch_rows, repo=repo)
+        # matchBlendedness(tract, patch_cols, patch_rows, repo=repo)
 
         gc.collect()
 
@@ -180,7 +183,7 @@ def matchBlendedness(tract, patch_cols, patch_rows, repo='/projects/MERIAN/repo/
         new_cols = [f'{filt}_blendedness_HSC_S20A' for filt in 'grizy'] + \
             [f'{filt}_blendedness_flag' for filt in 'grizy']
         new_cols += [f'{filt}_apertureflux10_HSC_S20A' for filt in 'grizy'] + \
-            [f'{filt}_apertureflux10_flag_HSC_S20A for filt in 'grizy']
+            [f'{filt}_apertureflux10_flag_HSC_S20A' for filt in 'grizy']
         new_cols += [f'{filt}_extendedness_value_HSC_S20A' for filt in 'grizy']
         
         blendCat.rename_columns(old_cols, new_cols)
