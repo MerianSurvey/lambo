@@ -4,17 +4,15 @@ import numpy as np
 sys.path.append(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/'))
 from astropy.table import Table, vstack, hstack
 import lsst.daf.butler as dafButler
-<<<<<<< HEAD
-from gaap import findReducedPatches, consolidateMerianCats
+#from gaap import consolidateMerianCats
+#from find_patches_to_reduce import findReducedPatches
 #from hsc_gaap.gaap import findReducedPatches, consolidateMerianCats
 import time
 import re
 from rtree import index
 
-=======
 from hsc_gaap.gaap import consolidateMerianCats
 from hsc_gaap.find_patches_to_reduce import findReducedPatches
->>>>>>> 2cf4b8335fab198c80db45db8982e3b958684cc5
 
 import fire
 
