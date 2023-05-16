@@ -14,9 +14,13 @@ keep_gaap_file = 'keep_table_columns_gaap.txt'
 repo = '/scratch/gpfs/am2907/Merian/gaap/'
 repo_out = '/scratch/gpfs/sd8758/merian/catalog/'
 
-def merge_merian_catalogs(tracts, repo=repo, alltracts=False, rewrite=False):
+def merge_merian_catalogs(tracts=[], repo=repo, alltracts=False, rewrite=False):
     keepColumns_merian = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_merian_file), dtype=None, encoding="ascii"))
     keepColumns_gaap = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_gaap_file), dtype=None, encoding="ascii"))
+
+    keepColumns_merian_540 = [c for c in keepColumns_merian if "540" in c]
+    keepColumns_merian_708 = [c for c in keepColumns_merian if "708" in c]
+    keepColumns_merian_all = [c for c in keepColumns_merian if ("708" not in c) & ("540" not in c)]
 
     if alltracts:
         tracts = glob.glob(os.path.join(repo, "log/*"))
@@ -32,12 +36,13 @@ def merge_merian_catalogs(tracts, repo=repo, alltracts=False, rewrite=False):
                 print(f"CATALOG FOR TRACT {tract} ALREADY WRITTEN - SKIPPING")
                 continue
             else:
-                print(f"CATALOG FOR TRACT {tract} ALREADY WRITTEN - REWRITTING")
+                print(f"CATALOG FOR TRACT {tract} ALREADY WRITTEN - REWRITING")
                 
         objectTables = np.array(glob.glob(catDir + "*/objectTable*"))
         
-        patches = findReducedPatches(tract)
-        patches.sort()
+        patches_708 = findReducedPatches(tract, band="N708")
+        patches_540 = findReducedPatches(tract, band="N540")
+        patches = np.unique(np.concatenate([patches_708, patches_540]))
 
         ot_patches = np.array([ot.split("_")[2] for ot in objectTables])
         ot_patches = np.array([int(otp[0]) + int(otp[2])*9 for otp in ot_patches])
@@ -55,16 +60,19 @@ def merge_merian_catalogs(tracts, repo=repo, alltracts=False, rewrite=False):
         tableList = []
         for patchno, patchpath in zip(ot_patches, objectTables):
             try:
-                merian = consolidateMerianCats([patchno], tract)[keepColumns_merian]
+                if (patchno in patches_708) & (patchno in patches_540):
+                    merian = consolidateMerianCats([patchno], tract)[keepColumns_merian]
+                elif patchno in patches_708:
+                    merian = consolidateMerianCats([patchno], tract)[keepColumns_merian_all + keepColumns_merian_708]
+                elif patchno in patches_540:
+                    merian = consolidateMerianCats([patchno], tract)[keepColumns_merian_all + keepColumns_merian_540]
             except:
-                try:
-                    merian = consolidateMerianCats([patchno], tract)[keepColumns_merian[:15]]
-                except:
-                    print(f"NO MERIAN OBJECT TABLES FOR TRACT {tract} PATCH {patchno} - SKIPPING")
-                    continue
+                print(f"NO MERIAN OBJECT TABLES FOR TRACT {tract} PATCH {patchno} - SKIPPING")
+                continue
             try:
                 gaapTable = Table.read(patchpath)[keepColumns_gaap]
             except:
+                print(f"GAAP COLUMN EXCEPTION FOR {tract}")
                 gaapTable = Table.read(patchpath)
                 keepColumns_exception = list(set(keepColumns_gaap).intersection(set(gaapTable.colnames)))
                 gaapTable = gaapTable[keepColumns_exception]
@@ -73,7 +81,7 @@ def merge_merian_catalogs(tracts, repo=repo, alltracts=False, rewrite=False):
             gaapTable.remove_columns(["objectId", "coord_ra", "coord_dec", "ebv"])
             
             stack_table = hstack([merian, gaapTable])
-            tableList.append()
+            tableList.append(stack_table)
 
         if len (tableList) == 0:
             continue
