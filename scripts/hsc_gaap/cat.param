@@ -1,0 +1,2 @@
+parameter	value	comments
+matchdist	0.5 	# matching radius for merian-hsc matching
