@@ -13,6 +13,7 @@ import numpy.ma as ma
 import time
 import re
 from rtree import index
+import pandas as pd
 
 #from hsc_gaap.gaap import consolidateMerianCats
 #from hsc_gaap.find_patches_to_reduce import findReducedPatches
@@ -29,6 +30,10 @@ repo = '/scratch/gpfs/am2907/Merian/gaap/'
 repo_out = '/scratch/gpfs/sd8758/merian/catalog/'
 s20a = hsc.Hsc(dr='dr3', rerun='s20a_wide')
 
+def load_param_file(filename='cat.param'):
+	dat = pd.read_csv(filename, delimiter='\t', header=0)
+	
+	return dat
 
 def merge_merian_catalogs(tracts=[], repo=repo, alltracts=False, rewrite=False):
     keepColumns_merian = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_merian_file), dtype=None, encoding="ascii"))
@@ -123,7 +128,7 @@ def select_unique_objs(tracts, repo=repo, alltracts=False):
 		if not isExist:
 			os.makedirs(outCatDir)
 
-		outSciCatFile = os.path.join(outCatDir, f'SciObjectTable_{tract}_S20A.fits') 
+		outSciCatFile = os.path.join(outCatDir, f'meriandr1_unique_{tract}_S20A.fits') 
 		tablePrimary.write(outSciCatFile, overwrite=True)
 
 
@@ -179,7 +184,7 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 
 	for tract in tracts:
 		catDir = os.path.join(repo, f"S20A/{tract}/")
-		catFile = os.path.join(catDir, f'SciObjectTable_{tract}_S20A.fits')
+		catFile = os.path.join(catDir, f'meriandr1_unique_{tract}_S20A.fits')
 
 
 		# Read catalog
@@ -217,7 +222,7 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 
 		# Write to a new fits file
 		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
-		outCatFile = os.path.join(outCatDir, f'SciObjectTableIsMask_{tract}_S20A.fits')
+		outCatFile = os.path.join(outCatDir, f'meriandr1_mask__{tract}_S20A.fits')
 		tractTable.write(outCatFile, overwrite=True)
 		
 
@@ -236,20 +241,24 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 
 		result_test = s20a.sql_query(sql_test, from_file=False, preview=False, verbose=True)
 		
-		outCatFile = os.path.join(outCatDir, f'HSC_gaap_{tract}_S20A.fits')
+		outCatFile = os.path.join(outCatDir, f'hsc_gaap_{tract}_S20A.fits')
 		result_test.write(outCatFile, overwrite=True)
 
 
-def merge_merian_hscS20A(tracts, matchdist=0.5):
+def merge_merian_hscS20A(tracts):
 	"""
 	Crossmatch Merian gaap catalog with S20A gaap catalog.
 	Matched objects are selected by being separated by less than matchdist arcseconds.
 	"""
 	
+	# read the matching radius from the cat.param file
+	df_param = load_param_file(filename='cat.param')
+	matchdist = df_param[df_param['parameter']=='matchdist']['value'].values[0] 
+
 	for tract in tracts:
 		catDir = os.path.join(repo_out, f"S20A/{tract}/")
-		hscGaap_file = f'HSC_gaap_{tract}_S20A.fits'
-		merianGaap_file = f'SciObjectTableIsMask_{tract}_S20A.fits'
+		hscGaap_file = f'hsc_gaap_{tract}_S20A.fits'
+		merianGaap_file = f'meriandr1_mask__{tract}_S20A.fits'
 	
 		if not os.path.isfile(os.path.join(catDir, hscGaap_file)):
 			raise ValueError(f"No HSC S20A gaap catalog at {os.path.join(catDir, hscGaap_file)}")
@@ -275,39 +284,45 @@ def merge_merian_hscS20A(tracts, matchdist=0.5):
 		_merian = SkyCoord(merianCat['coord_ra_Merian'], merianCat['coord_dec_Merian'], unit='deg')
 		idx, d2d, _ = _merian.match_to_catalog_sky(_hsc)
 
-		match = (d2d < 1.0 * u.arcsec)
+		match = (d2d < matchdist * u.arcsec)
 
 		combined_table = merianCat
 	
 		for i in range(len(hscCat.colnames)):
-			c = Column(np.full(len(merianCat), -99), name=hscCat.colnames[i])
+			current_col = hscCat.colnames[i]
+			c = Column(length=len(merianCat), name=hscCat.colnames[i], dtype=hscCat[current_col].dtype)
 			combined_table.add_column(c)
-
 		
+
+
+		hsc_match = np.zeros(len(combined_table))
 		for i in range(len(match)):
 			if match[i] == True:
+				hsc_match[i] = 1
 				hsc_idx = idx[i]
 				for j in range(len(hscCat.colnames)):
 					col = hscCat.colnames[j]
 					hsc_col_value = hscCat[col][hsc_idx]
 					if ma.is_masked(hsc_col_value) == False:
 						combined_table[col][i] = hsc_col_value
-
-			
+		combined_table['hsc_match'] = hsc_match
+	
+		print(type(combined_table['object_id_HSCS20A'][0]))
+		print(type(combined_table['z_apertureflux_10_flux_HSCS20A'][0]))
+	
 		# Write to a new fits file
 		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
-		outCatFile = os.path.join(outCatDir, f'SciObjectTableMerged_{tract}_S20A.fits')
+		outCatFile = os.path.join(outCatDir, f'meriandr1_hscmerged_{tract}_S20A.fits')
 		combined_table.write(outCatFile, overwrite=True)
 		print(f"MERGED HSC S20A + MERIAN TABLE OF SCIENCE OBJECTS WITH {len(combined_table)} ROWS and {len(combined_table.colnames)} COLUMNS")
 
+
 if __name__ == '__main__':
 
-
 #    fire.Fire(merge_merian_catalogs)
+
     fire.Fire(select_unique_objs)
     fire.Fire(apply_bright_star_mask)
-
     fire.Fire(download_s20a)
     fire.Fire(merge_merian_hscS20A)
-	
 
