@@ -14,6 +14,7 @@ import time
 import re
 from rtree import index
 import pandas as pd
+import time
 
 #from hsc_gaap.gaap import consolidateMerianCats
 #from hsc_gaap.find_patches_to_reduce import findReducedPatches
@@ -167,8 +168,7 @@ def check_object_in_circles(objects, circles):
     for j, obj in enumerate(objects):
         obj_ra, obj_dec = obj['ra'], obj['dec']
         result = list(idx.intersection((obj_ra, obj_dec, obj_ra, obj_dec)))
-        for i in result:
-            circle = circles[i]
+
             circle_ra, circle_dec, circle_radius = circle
             distance = ((obj_ra - circle_ra) ** 2 + (obj_dec - circle_dec) ** 2) ** 0.5
             if distance <= circle_radius:
@@ -179,9 +179,8 @@ def check_object_in_circles(objects, circles):
 
 def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 
-	maskDir = '/projects/MERIAN/starmask_s19a/'
-	maskFile = os.path.join(maskDir, f'BrightObjectMask-99999-9,9-HSC-I.reg') # I-band, it this what we want?
-
+	maskDir = '/projects/MERIAN/starmask_s20a/'
+	maskFile = os.path.join(maskDir, f'updated_S20A_mask.reg')
 	for tract in tracts:
 		catDir = os.path.join(repo, f"S20A/{tract}/")
 		catFile = os.path.join(catDir, f'meriandr1_unique_{tract}_S20A.fits')
@@ -318,7 +317,7 @@ def merge_merian_hscS20A(tracts):
 
 
 if __name__ == '__main__':
-
+    start_time = time.time()
 #    fire.Fire(merge_merian_catalogs)
 
     fire.Fire(select_unique_objs)
@@ -326,3 +325,4 @@ if __name__ == '__main__':
     fire.Fire(download_s20a)
     fire.Fire(merge_merian_hscS20A)
 
+    print("--- %s seconds ---" % (time.time() - start_time))
