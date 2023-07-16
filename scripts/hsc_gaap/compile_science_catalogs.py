@@ -5,6 +5,9 @@ sys.path.append(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/'))
 from astropy.table import Table, vstack, hstack, Column
 from astropy.coordinates import SkyCoord
 import astropy.units as u
+from astropy.io import fits
+from astropy.time import Time
+
 import lsst.daf.butler as dafButler
 import numpy.ma as ma
 #from gaap import consolidateMerianCats
@@ -123,14 +126,23 @@ def select_unique_objs(tracts, repo=repo, alltracts=False):
 		unique_flag = (tractTable['detect_isPrimary']==True) #Select unique objects using detect_isPrimary
 		tablePrimary = tractTable[unique_flag]
 		print(f"COMPILED TABLE OF UNIQUE SCIENCE OBJECTS WITH {len(tablePrimary)} ROWS and {len(tablePrimary.colnames)} COLUMNS")
-			
+
+		# Apply a S/N cut
+		df_tractPrimary = tablePrimary.to_pandas()
+		SNR_N708 = df_tractPrimary['N708_gaap1p0Flux']/df_tractPrimary['N708_gaap1p0FluxErr']
+		SNR_N540 = df_tractPrimary['N540_gaap1p0Flux']/df_tractPrimary['N540_gaap1p0FluxErr']
+		df_tractPrimary['SNR_N708'] = SNR_N708
+		df_tractPrimary['SNR_N540'] = SNR_N540
+		df_snr_cut = df_tractPrimary[(df_tractPrimary['SNR_N708'] > 5) | (df_tractPrimary['SNR_N540'] > 5)]
+		tablePrimaryCut = Table.from_pandas(df_snr_cut)		
+
 		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
 		isExist = os.path.exists(outCatDir)
 		if not isExist:
 			os.makedirs(outCatDir)
 
 		outSciCatFile = os.path.join(outCatDir, f'meriandr1_unique_{tract}_S20A.fits') 
-		tablePrimary.write(outSciCatFile, overwrite=True)
+		tablePrimaryCut.write(outSciCatFile, overwrite=True)
 
 
 def parse_circle(line, tract_center):
@@ -169,11 +181,13 @@ def check_object_in_circles(objects, circles):
         obj_ra, obj_dec = obj['ra'], obj['dec']
         result = list(idx.intersection((obj_ra, obj_dec, obj_ra, obj_dec)))
 
-            circle_ra, circle_dec, circle_radius = circle
-            distance = ((obj_ra - circle_ra) ** 2 + (obj_dec - circle_dec) ** 2) ** 0.5
-            if distance <= circle_radius:
-                objects_within_circles.append({'obj': obj, 'index': j})
-                break
+        for i in result:
+                circle = circles[i]
+                circle_ra, circle_dec, circle_radius = circle
+                distance = ((obj_ra - circle_ra) ** 2 + (obj_dec - circle_dec) ** 2) ** 0.5
+                if distance <= circle_radius:
+                     objects_within_circles.append({'obj': obj, 'index': j})
+                     break
     return objects_within_circles
 
 
@@ -221,7 +235,7 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 
 		# Write to a new fits file
 		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
-		outCatFile = os.path.join(outCatDir, f'meriandr1_mask__{tract}_S20A.fits')
+		outCatFile = os.path.join(outCatDir, f'meriandr1_mask_{tract}_S20A.fits')
 		tractTable.write(outCatFile, overwrite=True)
 		
 
@@ -229,6 +243,9 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 
 	sql_test = open(
         os.path.join(os.getenv("LAMBO_HOME"), 'lambo/scripts/hsc_gaap/HSC_S20A_tract.SQL'), 'r').read()
+	
+	maskDir = '/projects/MERIAN/starmask_s20a/'
+	maskFile = os.path.join(maskDir, f'updated_S20A_mask.reg')
 
 	for tract in tracts:
 
@@ -239,6 +256,37 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 		f'# SQL QUERY S20A FROM HSC DATABASE (s20a_wide.summary) FOR TRACT = {tract}')
 
 		result_test = s20a.sql_query(sql_test, from_file=False, preview=False, verbose=True)
+		
+		# Read HSC S20A catalog for this tract
+		objects = []
+		for ra, dec in zip(result_test['ra'], result_test['dec']):
+				objects.append({'ra': ra, 'dec': dec})
+		# Get tract ~center
+		objects_ra = list(map(lambda x: x['ra'], objects))
+		objects_dec = list(map(lambda x: x['dec'], objects))
+		tract_center = (np.median(objects_ra), np.median(objects_dec))
+	
+		# Read the circles from the file, choose only circles at the vicinity of the tract
+		circles = []
+		with open(maskFile, 'r') as file:
+			for line in file:
+				if line.startswith('circle'):
+					circle = parse_circle(line, tract_center)
+					if circle:
+						circles.append(circle)
+
+		# Check objects within circles
+		start_time = time.time()
+		objects_within_circles = check_object_in_circles(objects, circles)
+		elapsed_time = time.time() - start_time
+		print(f"Elapsed time: {elapsed_time} seconds")
+
+		# Add a new column (IsMask) to table with 0 for not masked by a bright star and 1 for being mask 
+		indices = list(map(lambda x: x['index'], objects_within_circles))
+		objects_list_len = len(objects)
+		IsMask = np.zeros(objects_list_len)
+		IsMask[indices] = 1
+		result_test['IsMask'] = IsMask
 		
 		outCatFile = os.path.join(outCatDir, f'hsc_gaap_{tract}_S20A.fits')
 		result_test.write(outCatFile, overwrite=True)
@@ -279,8 +327,8 @@ def merge_merian_hscS20A(tracts):
 		merianCat.rename_columns(merian_cols_old, merian_cols_new)
 
 
-		_hsc = SkyCoord(hscCat['ra_HSCS20A'], hscCat['dec_HSCS20A'], unit='deg')
-		_merian = SkyCoord(merianCat['coord_ra_Merian'], merianCat['coord_dec_Merian'], unit='deg')
+		_hsc = SkyCoord(hscCat['ra_HSCS20A'], hscCat['dec_HSCS20A'], unit='deg') # coords of all objects in hsc catalog
+		_merian = SkyCoord(merianCat['coord_ra_Merian'], merianCat['coord_dec_Merian'], unit='deg') # coords of all objects in merian catalog
 		idx, d2d, _ = _merian.match_to_catalog_sky(_hsc)
 
 		match = (d2d < matchdist * u.arcsec)
@@ -315,14 +363,67 @@ def merge_merian_hscS20A(tracts):
 		combined_table.write(outCatFile, overwrite=True)
 		print(f"MERGED HSC S20A + MERIAN TABLE OF SCIENCE OBJECTS WITH {len(combined_table)} ROWS and {len(combined_table.colnames)} COLUMNS")
 
+def make_use_catalog(tracts):
+	"""
+	Add a USE flag/column based on various parameters
+	Update the catalog fits header
+	"""
+
+	for tract in tracts:
+		catDir = os.path.join(repo_out, f"S20A/{tract}/")
+		mergedCat_file = f'meriandr1_hscmerged_{tract}_S20A.fits'
+
+		if not os.path.isfile(os.path.join(catDir, mergedCat_file)):
+			raise ValueError(f"No HSC Merian gaap catalog at {os.path.join(catDir, merianGaap_file)}")
+
+		
+		tractTable = Table.read(os.path.join(catDir, mergedCat_file))
+		Use = tractTable['IsMask_Merian']
+		Use = 1 - Use
+		tractTable['SciUse'] = Use
+
+		ifd = fits.HDUList([fits.PrimaryHDU(), fits.BinTableHDU()])
+		hdr = ifd[1].header
+
+		# Add new keywords to header
+		hdr['TRACT'] = (tract, 'Tract')
+		hdr['MERIANDR'] = ('DR1', 'Merian data release version')
+		hdr['LSSTPIPE'] = ('w_2022_29', 'LSSTPipe version')
+		hdr['SKYMAP'] = ('hsc_rings_v1', 'Skymap used in Merian data reduction')
+		hdr['HSCDR'] = ('S20A', 'HSC data release version')
+		hdr['HSCTABLE'] = ('s20a_wide.summary', 'HSC catalog')
+		hdr['STARMASK'] = ('S20A, i-band', 'HSC bright star mask')
+		hdr['ZP'] = ('None', 'GaaP photometry zeropoint')
+		hdr['DATE-CAT'] = (Time.now().iso, 'Date catalog was generated')		
+		hdr['SNR'] = (5, 'SNR cut applied')
+		hdr['GAAP'] = ('None', 'GaaP Version')
+		
+		hdr['COMMENT'] = 'This is a photometric catalog from the Merian Survey'
+		hdr['COMMENT'] = 'Project PIs: Alexie Leauthaud, Jenny Greene'
+		hdr['COMMENT'] = 'detect_isPrimary==True Flag Applied'
+		hdr['COMMENT'] = 'Catalog generated by ' + str(os.getlogin())			
+
+		ofd = fits.BinTableHDU(data=tractTable, header=hdr)
+		
+
+
+		# Write to a new fits file
+		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
+		outCatFile = os.path.join(outCatDir, f'meriandr1_use_{tract}_S20A.fits')
+
+		ofd.writeto(outCatFile, overwrite=True)
+
+		print(f"MERGED HSC S20A + MERIAN TABLE OF SCIENCE OBJECTS WITH {len(tractTable)} ROWS and {len(tractTable.colnames)} COLUMNS")		
 
 if __name__ == '__main__':
     start_time = time.time()
 #    fire.Fire(merge_merian_catalogs)
 
-    fire.Fire(select_unique_objs)
-    fire.Fire(apply_bright_star_mask)
-    fire.Fire(download_s20a)
-    fire.Fire(merge_merian_hscS20A)
+#    fire.Fire(select_unique_objs)
+#    fire.Fire(apply_bright_star_mask)
+#    fire.Fire(download_s20a)
+#    fire.Fire(merge_merian_hscS20A)
+    fire.Fire(make_use_catalog)
+
 
     print("--- %s seconds ---" % (time.time() - start_time))
