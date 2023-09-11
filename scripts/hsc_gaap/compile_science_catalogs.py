@@ -10,17 +10,12 @@ from astropy.time import Time
 
 import lsst.daf.butler as dafButler
 import numpy.ma as ma
-#from gaap import consolidateMerianCats
-#from find_patches_to_reduce import findReducedPatches
-#from hsc_gaap.gaap import findReducedPatches, consolidateMerianCats
 import time
 import re
 from rtree import index
 import pandas as pd
 import time
 
-#from hsc_gaap.gaap import consolidateMerianCats
-#from hsc_gaap.find_patches_to_reduce import findReducedPatches
 from gaap import consolidateMerianCats
 from find_patches_to_reduce import findReducedPatches
 
@@ -33,13 +28,15 @@ keep_gaap_file = 'keep_table_columns_gaap.txt'
 repo = '/scratch/gpfs/am2907/Merian/gaap/'
 repo_out = '/scratch/gpfs/sd8758/merian/catalog/'
 s20a = hsc.Hsc(dr='dr3', rerun='s20a_wide')
+cat_param_file = '/scratch/gpfs/sd8758/merian/lambo/scripts/hsc_gaap/cat.param'
 
-def load_param_file(filename='cat.param'):
+def load_param_file(filename=cat_param_file):
 	dat = pd.read_csv(filename, delimiter='\t', header=0)
 	
 	return dat
 
 def merge_merian_catalogs(tracts=[], repo=repo, alltracts=False, rewrite=False):
+    print("\n ----------------------- Runs merge_merian_catalogs -----------------------\n")
     keepColumns_merian = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_merian_file), dtype=None, encoding="ascii"))
     keepColumns_gaap = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_gaap_file), dtype=None, encoding="ascii"))
 
@@ -53,12 +50,14 @@ def merge_merian_catalogs(tracts=[], repo=repo, alltracts=False, rewrite=False):
         tracts.sort()
 
     for tract in tracts:
+        print("Working on tract: " + str(tract))
         catDir = os.path.join(repo, f"S20A/gaapTable/{tract}/")
         outCatFile = os.path.join(catDir, f'objectTable_{tract}_S20A.fits')
 
         if os.path.isfile(outCatFile):
             if not rewrite:
                 print(f"CATALOG FOR TRACT {tract} ALREADY WRITTEN - SKIPPING")
+                print("\n")
                 continue
             else:
                 print(f"CATALOG FOR TRACT {tract} ALREADY WRITTEN - REWRITING")
@@ -115,10 +114,13 @@ def merge_merian_catalogs(tracts=[], repo=repo, alltracts=False, rewrite=False):
         print(f"COMPILED TABLE OF {len(fullTable)} ROWS and {len(fullTable.colnames)} COLUMNS")
         fullTable.write(outCatFile, overwrite=True)
         print(f"WROTE TABLE TO {outCatFile}")
+        print("\n")
+
 
 def select_unique_objs(tracts, repo=repo, alltracts=False):
-
+	print("\n ----------------------- Runs select_unique_objs -----------------------\n")
 	for tract in tracts:
+		print("Working on tract: " + str(tract))
 		catDir = os.path.join(repo, f"S20A/gaapTable/{tract}/")
 		outCatFile = os.path.join(catDir, f'objectTable_{tract}_S20A.fits')
 
@@ -126,14 +128,34 @@ def select_unique_objs(tracts, repo=repo, alltracts=False):
 		unique_flag = (tractTable['detect_isPrimary']==True) #Select unique objects using detect_isPrimary
 		tablePrimary = tractTable[unique_flag]
 		print(f"COMPILED TABLE OF UNIQUE SCIENCE OBJECTS WITH {len(tablePrimary)} ROWS and {len(tablePrimary.colnames)} COLUMNS")
-
 		# Apply a S/N cut
 		df_tractPrimary = tablePrimary.to_pandas()
-		SNR_N708 = df_tractPrimary['N708_gaap1p0Flux']/df_tractPrimary['N708_gaap1p0FluxErr']
-		SNR_N540 = df_tractPrimary['N540_gaap1p0Flux']/df_tractPrimary['N540_gaap1p0FluxErr']
-		df_tractPrimary['SNR_N708'] = SNR_N708
-		df_tractPrimary['SNR_N540'] = SNR_N540
-		df_snr_cut = df_tractPrimary[(df_tractPrimary['SNR_N708'] > 5) | (df_tractPrimary['SNR_N540'] > 5)]
+
+		N708_exist = 0
+		N540_exist = 0
+		try:
+			SNR_N708 = df_tractPrimary['N708_gaap1p0Flux']/df_tractPrimary['N708_gaap1p0FluxErr']
+			df_tractPrimary['SNR_N708'] = SNR_N708
+			N708_exist = 1
+		except:
+			print("No N708 data")
+			N708_exist = 0		
+		try:
+			SNR_N540 = df_tractPrimary['N540_gaap1p0Flux']/df_tractPrimary['N540_gaap1p0FluxErr']
+			df_tractPrimary['SNR_N540'] = SNR_N540
+			N540_exist = 1
+		except:
+			print("No N540 data")
+			N540_exist = 0
+		
+		if (N708_exist==1 and N540_exist==1):
+			df_snr_cut = df_tractPrimary[(df_tractPrimary['SNR_N708'] > 5) | (df_tractPrimary['SNR_N540'] > 5)]
+		elif (N708_exist==1 and N540_exist==0):
+			df_snr_cut = df_tractPrimary[(df_tractPrimary['SNR_N708'] > 5)]
+		elif (N708_exist==0 and N540_exist==1):
+			df_snr_cut = df_tractPrimary[(df_tractPrimary['SNR_N540'] > 5)]	
+	
+		#df_snr_cut = df_tractPrimary[(df_tractPrimary['SNR_N708'] > 5) | (df_tractPrimary['SNR_N540'] > 5)]
 		tablePrimaryCut = Table.from_pandas(df_snr_cut)		
 
 		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
@@ -143,7 +165,7 @@ def select_unique_objs(tracts, repo=repo, alltracts=False):
 
 		outSciCatFile = os.path.join(outCatDir, f'meriandr1_unique_{tract}_S20A.fits') 
 		tablePrimaryCut.write(outSciCatFile, overwrite=True)
-
+		print("\n")
 
 def parse_circle(line, tract_center):
     tract_cen_ra, tract_cen_dec = tract_center
@@ -192,10 +214,11 @@ def check_object_in_circles(objects, circles):
 
 
 def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
-
+	print("\n ----------------------- Runs apply_bright_star_mask -----------------------\n")
 	maskDir = '/projects/MERIAN/starmask_s20a/'
 	maskFile = os.path.join(maskDir, f'updated_S20A_mask.reg')
 	for tract in tracts:
+		print("Working on tract: " + str(tract))
 		catDir = os.path.join(repo, f"S20A/{tract}/")
 		catFile = os.path.join(catDir, f'meriandr1_unique_{tract}_S20A.fits')
 
@@ -225,7 +248,7 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 		objects_within_circles = check_object_in_circles(objects, circles)
 		elapsed_time = time.time() - start_time
 		print(f"Elapsed time: {elapsed_time} seconds")
-
+		print("\n")
 		# Add a new column (IsMask) to table with 0 for not masked by a bright star and 1 for being mask 
 		indices = list(map(lambda x: x['index'], objects_within_circles))
 		objects_list_len = len(objects)
@@ -240,14 +263,16 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 		
 
 def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
-
-	sql_test = open(
-        os.path.join(os.getenv("LAMBO_HOME"), 'lambo/scripts/hsc_gaap/HSC_S20A_tract.SQL'), 'r').read()
+	print("\n ----------------------- Runs download_s20a -----------------------\n")
+	#sql_test = open(
+        #os.path.join(os.getenv("LAMBO_HOME"), 'lambo/scripts/hsc_gaap/HSC_S20A_tract.SQL'), 'r').read()
 	
 	maskDir = '/projects/MERIAN/starmask_s20a/'
 	maskFile = os.path.join(maskDir, f'updated_S20A_mask.reg')
 
 	for tract in tracts:
+		print("Working on tract: " + str(tract))
+		sql_test = open(os.path.join(os.getenv("LAMBO_HOME"), 'lambo/scripts/hsc_gaap/HSC_S20A_tract.SQL'), 'r').read()
 
 		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")		
 
@@ -265,6 +290,7 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 		objects_ra = list(map(lambda x: x['ra'], objects))
 		objects_dec = list(map(lambda x: x['dec'], objects))
 		tract_center = (np.median(objects_ra), np.median(objects_dec))
+		print('tract center: ' + str(tract_center))
 	
 		# Read the circles from the file, choose only circles at the vicinity of the tract
 		circles = []
@@ -290,22 +316,26 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 		
 		outCatFile = os.path.join(outCatDir, f'hsc_gaap_{tract}_S20A.fits')
 		result_test.write(outCatFile, overwrite=True)
+		print("\n")
 
 
 def merge_merian_hscS20A(tracts):
 	"""
-	Crossmatch Merian gaap catalog with S20A gaap catalog.
+	Crossmatch Merian gaap catalog with S20A gaap catalog
 	Matched objects are selected by being separated by less than matchdist arcseconds.
 	"""
 	
 	# read the matching radius from the cat.param file
-	df_param = load_param_file(filename='cat.param')
+	df_param = load_param_file(filename=cat_param_file)
 	matchdist = df_param[df_param['parameter']=='matchdist']['value'].values[0] 
 
+	print("\n ----------------------- Runs merge_merian_hscS20A -----------------------\n")
+ 
 	for tract in tracts:
+		print("Working on tract: " + str(tract))
 		catDir = os.path.join(repo_out, f"S20A/{tract}/")
 		hscGaap_file = f'hsc_gaap_{tract}_S20A.fits'
-		merianGaap_file = f'meriandr1_mask__{tract}_S20A.fits'
+		merianGaap_file = f'meriandr1_mask_{tract}_S20A.fits'
 	
 		if not os.path.isfile(os.path.join(catDir, hscGaap_file)):
 			raise ValueError(f"No HSC S20A gaap catalog at {os.path.join(catDir, hscGaap_file)}")
@@ -354,14 +384,15 @@ def merge_merian_hscS20A(tracts):
 						combined_table[col][i] = hsc_col_value
 		combined_table['hsc_match'] = hsc_match
 	
-		print(type(combined_table['object_id_HSCS20A'][0]))
-		print(type(combined_table['z_apertureflux_10_flux_HSCS20A'][0]))
+		#print(type(combined_table['object_id_HSCS20A'][0]))
+		#print(type(combined_table['z_apertureflux_10_flux_HSCS20A'][0]))
 	
 		# Write to a new fits file
 		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
 		outCatFile = os.path.join(outCatDir, f'meriandr1_hscmerged_{tract}_S20A.fits')
 		combined_table.write(outCatFile, overwrite=True)
 		print(f"MERGED HSC S20A + MERIAN TABLE OF SCIENCE OBJECTS WITH {len(combined_table)} ROWS and {len(combined_table.colnames)} COLUMNS")
+		print("\n")
 
 def make_use_catalog(tracts):
 	"""
@@ -369,7 +400,10 @@ def make_use_catalog(tracts):
 	Update the catalog fits header
 	"""
 
+	print("\n ----------------------- Runs make_use_catalog -----------------------\n")
+
 	for tract in tracts:
+		print("Working on tract: " + str(tract))
 		catDir = os.path.join(repo_out, f"S20A/{tract}/")
 		mergedCat_file = f'meriandr1_hscmerged_{tract}_S20A.fits'
 
@@ -393,10 +427,10 @@ def make_use_catalog(tracts):
 		hdr['HSCDR'] = ('S20A', 'HSC data release version')
 		hdr['HSCTABLE'] = ('s20a_wide.summary', 'HSC catalog')
 		hdr['STARMASK'] = ('S20A, i-band', 'HSC bright star mask')
-		hdr['ZP'] = ('None', 'GaaP photometry zeropoint')
+		hdr['ZP'] = ('31.4', 'GaaP photometry zeropoint')
 		hdr['DATE-CAT'] = (Time.now().iso, 'Date catalog was generated')		
 		hdr['SNR'] = (5, 'SNR cut applied')
-		hdr['GAAP'] = ('None', 'GaaP Version')
+		hdr['GAAP'] = ('4.0.1', 'lsst-scipipe stack utilized when running the GaaP photometry')
 		
 		hdr['COMMENT'] = 'This is a photometric catalog from the Merian Survey'
 		hdr['COMMENT'] = 'Project PIs: Alexie Leauthaud, Jenny Greene'
@@ -414,16 +448,16 @@ def make_use_catalog(tracts):
 		ofd.writeto(outCatFile, overwrite=True)
 
 		print(f"MERGED HSC S20A + MERIAN TABLE OF SCIENCE OBJECTS WITH {len(tractTable)} ROWS and {len(tractTable.colnames)} COLUMNS")		
-
+		print("\n")
+	
 if __name__ == '__main__':
     start_time = time.time()
-#    fire.Fire(merge_merian_catalogs)
 
-#    fire.Fire(select_unique_objs)
-#    fire.Fire(apply_bright_star_mask)
-#    fire.Fire(download_s20a)
-#    fire.Fire(merge_merian_hscS20A)
+    fire.Fire(merge_merian_catalogs)
+    fire.Fire(select_unique_objs)
+    fire.Fire(apply_bright_star_mask)
+    fire.Fire(download_s20a)
+    fire.Fire(merge_merian_hscS20A)
     fire.Fire(make_use_catalog)
-
 
     print("--- %s seconds ---" % (time.time() - start_time))
