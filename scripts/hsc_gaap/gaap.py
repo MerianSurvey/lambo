@@ -447,7 +447,7 @@ class GaapTask(object):
             transConfig.functorFile = functorFile
         with suppress(NotImplementedError):
             transTask = TransformObjectCatalogTask(config=transConfig)
-            transTask.funcs.log.setLevel('FATAL')
+            transTask.log.setLevel('FATAL')
             self.objectTable = transTask.run(parq)
 
         if self.logger is not None:
@@ -568,37 +568,3 @@ def NaiveLogger(filename):
     logger = logging.getLogger('GaapMaster')
 
     return logger
-
-def findReducedPatches(tract, band="N708", output_collection='DECam/runs/merian/dr1_wide', skymap='hsc_rings_v1'):
-    """Find all patches that have the necessary Merian data products for gaap photometry"""
-
-    butler = dafButler.Butler('/projects/MERIAN/repo/')
-
-    dataId = dict(tract=tract, band=band, skymap=skymap)
-    
-    deepCoadd_ref_patches = set([item.dataId["patch"] for item in 
-                                butler.registry.queryDatasets('deepCoadd_ref', 
-                                dataId=dataId, collections=output_collection,
-                                skymap=skymap)])
-
-    deepCoadd_meas_patches = set([item.dataId["patch"] for item in 
-                                butler.registry.queryDatasets('deepCoadd_meas', 
-                                dataId=dataId, collections=output_collection,
-                                skymap=skymap)])
-
-    deepCoadd_scarletModelData_patches = set([item.dataId["patch"] for item in 
-                                butler.registry.queryDatasets('deepCoadd_scarletModelData', 
-                                dataId=dataId, collections=output_collection,
-                                skymap=skymap)])
-
-    deepCoadd_calexp_patches = set([item.dataId["patch"] for item in 
-                                butler.registry.queryDatasets('deepCoadd_calexp', 
-                                dataId=dataId, collections=output_collection,
-                                skymap=skymap)])
-
-    del butler
-
-    patches = deepCoadd_ref_patches.intersection(deepCoadd_meas_patches, 
-                                                deepCoadd_scarletModelData_patches, 
-                                                deepCoadd_calexp_patches)
-    return(np.array(list(patches)))

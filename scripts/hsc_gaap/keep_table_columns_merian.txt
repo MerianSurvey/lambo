@@ -4,6 +4,14 @@ coord_dec
 ebv
 tract
 patch
+detect_isPrimary
+detect_isDeblendedModelSource
+detect_isPatchInner
+detect_isTractInner
+merge_peak_sky
+deblend_skipped
+parentObjectId
+deblend_nChild
 N708_gaap1p0Flux
 N708_gaap1p0FluxErr
 N708_blendedness

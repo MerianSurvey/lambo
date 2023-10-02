@@ -10,17 +10,22 @@ sys.path.append(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/'))
 from hsc_gaap.gaap import findReducedPatches
 from hsc_gaap.check_gaap_run import checkRun
 
-def deploy_training_job(tract, filter_jobs=5,
+def deploy_training_job(tract, band="N708", filter_jobs=5,
                         python_file='lambo/scripts/hsc_gaap/run_gaap.py',
                         name='gaap', email="am2907@princeton.edu", outname = None, 
-                        repo='/projects/MERIAN/repo/', submit=False, fixpatches=False):
+                        repo='/projects/MERIAN/repo/', scriptdir = ".", submit=False, fixpatches=False):
         
     ''' Create slurm script to process all patches already reduced in Merian for a given tract.
     '''
 
     # Get a list of reduced patches for a given tract  
     if not fixpatches:
-        patches = findReducedPatches(tract)
+        patches_n708 = findReducedPatches(tract, band="N708")
+        if band=="N540":
+            patches_n540 = findReducedPatches(tract, band="N540")
+            patches = np.array(list(set(patches_n540) - set(patches_n708)))
+        else:
+            patches = patches_n708 
     else:
         patches = checkRun(tract, repo=repo, output=False)
 
@@ -36,7 +41,7 @@ def deploy_training_job(tract, filter_jobs=5,
         "#SBATCH --time=%s" % time,
         f"#SBATCH --array={','.join(patches.astype(str))}",
         "#SBATCH --export=ALL",
-        f"#SBATCH -o ./log/{tract}/%a.o",
+        f"#SBATCH -o {scriptdir}/log/{tract}/%a.o",
         "#SBATCH --mail-type=all",
         f"#SBATCH --mail-user={email}",
         "",
@@ -50,7 +55,7 @@ def deploy_training_job(tract, filter_jobs=5,
         f". {os.getenv('LAMBO_HOME')}/lambo/scripts/setup_env_w40.sh",
         f"export LAMBO_HOME='{os.getenv('LAMBO_HOME')}'",
         "",
-        f"python {python_file} --tract={tract} --patch_cols=\"[`expr $SLURM_ARRAY_TASK_ID % 9`]\" --patch_rows=\"[`expr $SLURM_ARRAY_TASK_ID / 9`]\" --filter_jobs={filter_jobs} --hsc_type='S20A' --repo={repo}",
+        f"python {python_file} --tract={tract} --patch_cols=\"[`expr $SLURM_ARRAY_TASK_ID % 9`]\" --patch_rows=\"[`expr $SLURM_ARRAY_TASK_ID / 9`]\" --filter_jobs={filter_jobs} --hsc_type='S20A' --repo={repo} --logdir={scriptdir} --mer_band={band}",
         "",
         "",
         'now=$(date +"%T")',
@@ -62,15 +67,17 @@ def deploy_training_job(tract, filter_jobs=5,
         outname = str(tract)
         if fixpatches:
             outname += "_fixing"
-    if not os.path.isdir('./slurmscripts'):
-        os.mkdir("./slurmscripts")
-    if not os.path.isdir(f'./log/{tract}'):
-        os.makedirs(f'./log/{tract}')
-    f = open(f'slurmscripts/{outname}.slurm', 'w')
+        if band == "N540":
+            outname += "_N540"
+    if not os.path.isdir(f'{scriptdir}/slurmscripts'):
+        os.mkdir(f"{scriptdir}/slurmscripts")
+    if not os.path.isdir(f'{scriptdir}/log/{tract}'):
+        os.makedirs(f'{scriptdir}/log/{tract}')
+    f = open(f'{scriptdir}/slurmscripts/{outname}.slurm', 'w')
     f.write(cntnt)
     f.close()
     if submit:
-        os.system(f'sbatch ./slurmscripts/{outname}.slurm')
+        os.system(f'sbatch {scriptdir}/slurmscripts/{outname}.slurm')
     return None
     
 if __name__ == '__main__':

@@ -5,7 +5,7 @@ import lsst.daf.butler as dafButler
 from unagi import hsc
 s20a = hsc.Hsc(dr='dr3', rerun='s20a_wide')
 sys.path.append(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/'))
-from hsc_gaap.gaap import findReducedPatches
+from hsc_gaap.find_patches_to_reduce import findReducedPatches
 
 def download_hsc_coadd(tract=9813, patch='8,6', filt='i', outdir='/projects/MERIAN/repo/'):
     outdir = os.path.join(outdir, 'S20A/deepCoadd_calexp', str(tract), str(patch))
@@ -46,7 +46,7 @@ def download_blendedness(tract=9813, patch='8,6', save=False, outdir='/projects/
     return result_test
 
 
-def runDownload(tract=9813, outdir='/projects/MERIAN/repo/', only_merian=True, alltracts=False):
+def runDownload(tract=9813, outdir='/projects/MERIAN/repo/', band="N708", only_merian=True, alltracts=False):
     # download all patches for all tracts with merian reduced data
     if alltracts:
         output_collection = "DECam/runs/merian/dr1_wide"
@@ -60,11 +60,16 @@ def runDownload(tract=9813, outdir='/projects/MERIAN/repo/', only_merian=True, a
         del butler 
 
         for t in tracts:
-            runDownload(tract=t, outdir=outdir, only_merian=only_merian, alltracts=False)
-        return()   
+            runDownload(tract=t, outdir=outdir, only_merian=only_merian, alltracts=False, band=band)
+        return()
+
+    if type(tract) is list:
+        for t in tract:
+            runDownload(tract=t, outdir=outdir, only_merian=only_merian, alltracts=False, band=band)
+        return()
 
     if only_merian:
-        patches = findReducedPatches(tract)
+        patches = findReducedPatches(tract, band=band)
         patches = [[p % 9, int(p/9)] for p in patches]
 
     else:

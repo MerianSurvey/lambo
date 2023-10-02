@@ -4,20 +4,26 @@ import numpy as np
 sys.path.append(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/'))
 import fire
 
-from hsc_gaap.gaap import findReducedPatches
+from hsc_gaap.find_patches_to_reduce import findReducedPatches
 
-def checkRun(tract, repo = '/scratch/gpfs/am2907/Merian/gaap/', output=True):
+def checkRun(tract, band="N708", repo = '/scratch/gpfs/am2907/Merian/gaap/', output=True):
     if output:
         print(f'TRACT: {tract}')
     problem_patches=[]
 
-    patches = findReducedPatches(tract)
+    patches = findReducedPatches(tract, band="N708")
+    if band=="N540":
+        patches_n540 = findReducedPatches(tract, band="N540")
+        patches = np.array(list(set(patches_n540) - set(patches)))
+
     dir = os.path.join(repo, f"log/{tract}/")
     logs = np.array(glob.glob(dir + "*.o"))
     logs_patches = np.array([log.split("/")[-1].split(".")[0] for log in logs]).astype(int)
     logs, logs_patches = logs[logs_patches.argsort()], logs_patches[logs_patches.argsort()]
 
-    if len(logs) != len(patches):
+    missinglogs = len(set(patches) - set([int(log.split("/")[-1].split(".")[0]) for log in logs]))>0
+
+    if missinglogs:
         print("MISSING PATCHES")
 
     error1 = "Wrote GAaP table to "
@@ -48,12 +54,12 @@ def checkRun(tract, repo = '/scratch/gpfs/am2907/Merian/gaap/', output=True):
                 print (f'PROBLEM IN PATCH {logs_patches[i]}: Failed for {5 - logfile.count("Finished the GAaP measureTask for band")} bands')
             problem_patches.append(logs_patches[i])
 
-        if error3 not in logfile:
-            if output:
-                print (f'PROBLEM IN PATCH {logs_patches[i]}: Blend matching failed')
-            problem_patches.append(logs_patches[i])
+        # if error3 not in logfile:
+        #     if output:
+        #         print (f'PROBLEM IN PATCH {logs_patches[i]}: Blend matching failed')
+        #     problem_patches.append(logs_patches[i])
 
-    if (len(problem_patches)==0) & (len(logs) == len(patches)):
+    if (len(problem_patches)==0) & (not missinglogs):
         print ("NO PROBLEMS")
     print()
 
