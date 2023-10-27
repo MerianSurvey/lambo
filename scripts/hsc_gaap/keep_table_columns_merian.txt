@@ -14,6 +14,10 @@ parentObjectId
 deblend_nChild
 N708_gaap1p0Flux
 N708_gaap1p0FluxErr
+N708_gaap1p5Flux
+N708_gaap1p5FluxErr
+N708_gaap2p5Flux
+N708_gaap2p5FluxErr
 N708_blendedness
 N708_gaapOptimalFlux
 N708_gaapOptimalFluxErr
@@ -23,6 +27,10 @@ N708_cModelFlux_inner
 N708_cModel_flag
 N540_gaap1p0Flux
 N540_gaap1p0FluxErr
+N540_gaap1p5Flux
+N540_gaap1p5FluxErr
+N540_gaap2p5Flux
+N540_gaap2p5FluxErr
 N540_blendedness
 N540_gaapOptimalFlux
 N540_gaapOptimalFluxErr

@@ -4,6 +4,10 @@ coord_dec
 ebv
 g_gaap1p0Flux
 g_gaap1p0FluxErr
+g_gaap1p5Flux
+g_gaap1p5FluxErr
+g_gaap2p5Flux
+g_gaap2p5FluxErr
 g_gaapOptimalFlux
 g_gaapOptimalFluxErr
 g_cModelFlux
@@ -12,6 +16,10 @@ g_cModelFlux_inner
 g_cModel_flag
 r_gaap1p0Flux
 r_gaap1p0FluxErr
+r_gaap1p5Flux
+r_gaap1p5FluxErr
+r_gaap2p5Flux
+r_gaap2p5FluxErr
 r_gaapOptimalFlux
 r_gaapOptimalFluxErr
 r_cModelFlux
@@ -20,6 +28,10 @@ r_cModelFlux_inner
 r_cModel_flag
 i_gaap1p0Flux
 i_gaap1p0FluxErr
+i_gaap1p5Flux
+i_gaap1p5FluxErr
+i_gaap2p5Flux
+i_gaap2p5FluxErr
 i_gaapOptimalFlux
 i_gaapOptimalFluxErr
 i_cModelFlux
@@ -28,6 +40,10 @@ i_cModelFlux_inner
 i_cModel_flag
 z_gaap1p0Flux
 z_gaap1p0FluxErr
+z_gaap1p5Flux
+z_gaap1p5FluxErr
+z_gaap2p5Flux
+z_gaap2p5FluxErr
 z_gaapOptimalFlux
 z_gaapOptimalFluxErr
 z_cModelFlux
@@ -36,6 +52,10 @@ z_cModelFlux_inner
 z_cModel_flag
 y_gaap1p0Flux
 y_gaap1p0FluxErr
+y_gaap1p5Flux
+y_gaap1p5FluxErr
+y_gaap2p5Flux
+y_gaap2p5FluxErr
 y_gaapOptimalFlux
 y_gaapOptimalFluxErr
 y_cModelFlux
