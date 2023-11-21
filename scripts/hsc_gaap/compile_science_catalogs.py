@@ -35,7 +35,7 @@ def load_param_file(filename=cat_param_file):
 	
 	return dat
 
-def merge_merian_catalogs(tracts=[], repo=repo, alltracts=False, rewrite=False):
+def merge_merian_catalogs(tracts=[], repo=repo, alltracts=False, rewrite=True):
     print("\n ----------------------- Runs merge_merian_catalogs -----------------------\n")
     keepColumns_merian = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_merian_file), dtype=None, encoding="ascii"))
     keepColumns_gaap = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_gaap_file), dtype=None, encoding="ascii"))
@@ -134,14 +134,14 @@ def select_unique_objs(tracts, repo=repo, alltracts=False):
 		N708_exist = 0
 		N540_exist = 0
 		try:
-			SNR_N708 = df_tractPrimary['N708_gaap1p0Flux']/df_tractPrimary['N708_gaap1p0FluxErr']
+			SNR_N708 = df_tractPrimary['N708_gaap1p5Flux']/df_tractPrimary['N708_gaap1p5FluxErr']
 			df_tractPrimary['SNR_N708'] = SNR_N708
 			N708_exist = 1
 		except:
 			print("No N708 data")
 			N708_exist = 0		
 		try:
-			SNR_N540 = df_tractPrimary['N540_gaap1p0Flux']/df_tractPrimary['N540_gaap1p0FluxErr']
+			SNR_N540 = df_tractPrimary['N540_gaap1p5Flux']/df_tractPrimary['N540_gaap1p5FluxErr']
 			df_tractPrimary['SNR_N540'] = SNR_N540
 			N540_exist = 1
 		except:
