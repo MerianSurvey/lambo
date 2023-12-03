@@ -285,7 +285,8 @@ class GaapTask(object):
         measureConfig.footprintDatasetName = 'ScarletModelData'
         # measureConfig.footprintDatasetName = 'DeblendedFlux'
         # measureConfig.measurement.doReplaceWithNoise = False
-
+        
+        # Add plugins
         measureConfig.measurement.plugins.names.add("base_PsfFlux")
         measureConfig.measurement.plugins.names.add(
             "base_CircularApertureFlux")
@@ -302,6 +303,14 @@ class GaapTask(object):
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].doOptimalPhotometry = True
         measureConfig.measurement.plugins["ext_gaap_GaapFlux"].sigmas = [
             0.5, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.5, 2.0, 2.5, 3.5]
+        
+        # Date: 2023-12-03
+        # Add slots (aliases) to point "slot_psfFlux" to "base_PsfFlux"
+        # "slot_psfFlux" is actually used when writing the object table
+        measureConfig.measurement.slots.apFlux = 'base_CircularApertureFlux_12_0'
+        measureConfig.measurement.slots.modelFlux = 'modelfit_CModel'
+        measureConfig.measurement.slots.psfFlux = 'base_PsfFlux'
+        
         self.measureConfig = measureConfig
 
     def setLogger(self, task):
