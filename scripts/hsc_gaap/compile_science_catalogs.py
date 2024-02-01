@@ -30,6 +30,7 @@ repo_out = '/scratch/gpfs/sd8758/merian/catalog/'
 s20a = hsc.Hsc(dr='dr3', rerun='s20a_wide')
 cat_param_file = '/scratch/gpfs/sd8758/merian/lambo/scripts/hsc_gaap/cat.param'
 
+
 def load_param_file(filename=cat_param_file):
 	dat = pd.read_csv(filename, delimiter='\t', header=0)
 	
@@ -39,6 +40,7 @@ def merge_merian_catalogs(tracts=[], repo=repo, alltracts=False, rewrite=True):
     print("\n ----------------------- Runs merge_merian_catalogs -----------------------\n")
     keepColumns_merian = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_merian_file), dtype=None, encoding="ascii"))
     keepColumns_gaap = list(np.genfromtxt(os.path.join(os.getenv('LAMBO_HOME'), 'lambo/scripts/hsc_gaap/', keep_gaap_file), dtype=None, encoding="ascii"))
+
 
     keepColumns_merian_540 = [c for c in keepColumns_merian if "540" in c]
     keepColumns_merian_708 = [c for c in keepColumns_merian if "708" in c]
@@ -83,6 +85,7 @@ def merge_merian_catalogs(tracts=[], repo=repo, alltracts=False, rewrite=True):
 
         tableList = []
         for patchno, patchpath in zip(ot_patches, objectTables):
+            #print(consolidateMerianCats([patchno], tract).columns)
             try:
                 if (patchno in patches_708) & (patchno in patches_540):
                     merian = consolidateMerianCats([patchno], tract)[keepColumns_merian]
@@ -215,9 +218,15 @@ def check_object_in_circles(objects, circles):
 
 def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 	print("\n ----------------------- Runs apply_bright_star_mask -----------------------\n")
+	
 	maskDir = '/projects/MERIAN/starmask_s20a/'
 	maskFile = os.path.join(maskDir, f'updated_S20A_mask.reg')
+	
+
 	for tract in tracts:
+		#maskDir = '/scratch/gpfs/sd8758/merian/catalog/bright_object_mask/BrightObjectMasks/'+str(tract)+'/'
+		#maskFile = os.path.join(maskDir, f'S20A_mask_'+str(tract)+'.reg')
+		
 		print("Working on tract: " + str(tract))
 		catDir = os.path.join(repo, f"S20A/{tract}/")
 		catFile = os.path.join(catDir, f'meriandr1_unique_{tract}_S20A.fits')
@@ -243,6 +252,11 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
                 				circles.append(circle)
 	
 
+		# keep only small circles (less conserevative mask)
+		circles_large = circles
+		circles = circles_large[::2]
+
+
 		# Check objects within circles
 		start_time = time.time()
 		objects_within_circles = check_object_in_circles(objects, circles)
@@ -264,7 +278,6 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 
 def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 	print("\n ----------------------- Runs download_s20a -----------------------\n")
-	#sql_test = open(
         #os.path.join(os.getenv("LAMBO_HOME"), 'lambo/scripts/hsc_gaap/HSC_S20A_tract.SQL'), 'r').read()
 	
 	maskDir = '/projects/MERIAN/starmask_s20a/'
@@ -273,15 +286,15 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 	for tract in tracts:
 		print("Working on tract: " + str(tract))
 		sql_test = open(os.path.join(os.getenv("LAMBO_HOME"), 'lambo/scripts/hsc_gaap/HSC_S20A_tract.SQL'), 'r').read()
-
 		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")		
 
 		sql_test = sql_test.replace('8524', str(tract))	
 		print(
 		f'# SQL QUERY S20A FROM HSC DATABASE (s20a_wide.summary) FOR TRACT = {tract}')
 
-		result_test = s20a.sql_query(sql_test, from_file=False, preview=False, verbose=True)
-		
+		result_test = s20a.sql_query(sql_test, from_file=False, preview=False, verbose=True)	
+	
+		# Use this chunck of code only if we want to apply the mask also to the HSC S20A catalog
 		# Read HSC S20A catalog for this tract
 		objects = []
 		for ra, dec in zip(result_test['ra'], result_test['dec']):
@@ -291,7 +304,7 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 		objects_dec = list(map(lambda x: x['dec'], objects))
 		tract_center = (np.median(objects_ra), np.median(objects_dec))
 		print('tract center: ' + str(tract_center))
-	
+
 		# Read the circles from the file, choose only circles at the vicinity of the tract
 		circles = []
 		with open(maskFile, 'r') as file:
@@ -300,6 +313,10 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 					circle = parse_circle(line, tract_center)
 					if circle:
 						circles.append(circle)
+
+		# keep only small circles (less conserevative mask)
+		circles_large = circles
+		circles = circles_large[::2]
 
 		# Check objects within circles
 		start_time = time.time()
@@ -313,6 +330,8 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 		IsMask = np.zeros(objects_list_len)
 		IsMask[indices] = 1
 		result_test['IsMask'] = IsMask
+		# End of code if we apply the mask to the HSC S20A catalog
+		
 		
 		outCatFile = os.path.join(outCatDir, f'hsc_gaap_{tract}_S20A.fits')
 		result_test.write(outCatFile, overwrite=True)
@@ -454,10 +473,10 @@ if __name__ == '__main__':
     start_time = time.time()
 
     fire.Fire(merge_merian_catalogs)
-    fire.Fire(select_unique_objs)
-    fire.Fire(apply_bright_star_mask)
-    fire.Fire(download_s20a)
-    fire.Fire(merge_merian_hscS20A)
-    fire.Fire(make_use_catalog)
+    #fire.Fire(select_unique_objs)
+    #fire.Fire(apply_bright_star_mask)
+    #fire.Fire(download_s20a)
+    #fire.Fire(merge_merian_hscS20A)
+    #fire.Fire(make_use_catalog)
 
     print("--- %s seconds ---" % (time.time() - start_time))
