@@ -29,7 +29,7 @@ repo = '/scratch/gpfs/am2907/Merian/gaap/'
 repo_out = '/scratch/gpfs/sd8758/merian/catalog/'
 s20a = hsc.Hsc(dr='dr3', rerun='s20a_wide')
 cat_param_file = '/scratch/gpfs/sd8758/merian/lambo/scripts/hsc_gaap/cat.param'
-
+aper_corr_dict = {'g':1.0495, 'r':1.0479, 'i':1.0437, 'z':1.0377, 'y':1.0542}
 
 def load_param_file(filename=cat_param_file):
 	dat = pd.read_csv(filename, delimiter='\t', header=0)
@@ -124,6 +124,7 @@ def select_unique_objs(tracts, repo=repo, alltracts=False):
 	print("\n ----------------------- Runs select_unique_objs -----------------------\n")
 	for tract in tracts:
 		print("Working on tract: " + str(tract))
+
 		catDir = os.path.join(repo, f"S20A/gaapTable/{tract}/")
 		outCatFile = os.path.join(catDir, f'objectTable_{tract}_S20A.fits')
 
@@ -133,6 +134,46 @@ def select_unique_objs(tracts, repo=repo, alltracts=False):
 		print(f"COMPILED TABLE OF UNIQUE SCIENCE OBJECTS WITH {len(tablePrimary)} ROWS and {len(tablePrimary.colnames)} COLUMNS")
 		# Apply a S/N cut
 		df_tractPrimary = tablePrimary.to_pandas()
+		
+		# add columns with aperture correction applied to grizy
+		g_gaap1p0Flux_aperCorr = df_tractPrimary['g_gaap1p0Flux']*aper_corr_dict['g']
+		g_gaap1p5Flux_aperCorr = df_tractPrimary['g_gaap1p5Flux']*aper_corr_dict['g']
+		g_gaap2p5Flux_aperCorr = df_tractPrimary['g_gaap2p5Flux']*aper_corr_dict['g']
+		df_tractPrimary['g_gaap1p0Flux_aperCorr'] = g_gaap1p0Flux_aperCorr
+		df_tractPrimary['g_gaap1p5Flux_aperCorr'] = g_gaap1p5Flux_aperCorr
+		df_tractPrimary['g_gaap2p5Flux_aperCorr'] = g_gaap2p5Flux_aperCorr
+
+
+		r_gaap1p0Flux_aperCorr = df_tractPrimary['r_gaap1p0Flux']*aper_corr_dict['r']
+		r_gaap1p5Flux_aperCorr = df_tractPrimary['r_gaap1p5Flux']*aper_corr_dict['r']
+		r_gaap2p5Flux_aperCorr = df_tractPrimary['r_gaap2p5Flux']*aper_corr_dict['r']
+		df_tractPrimary['r_gaap1p0Flux_aperCorr'] = r_gaap1p0Flux_aperCorr
+		df_tractPrimary['r_gaap1p5Flux_aperCorr'] = r_gaap1p5Flux_aperCorr
+		df_tractPrimary['r_gaap2p5Flux_aperCorr'] = r_gaap2p5Flux_aperCorr
+
+		i_gaap1p0Flux_aperCorr = df_tractPrimary['i_gaap1p0Flux']*aper_corr_dict['i']
+		i_gaap1p5Flux_aperCorr = df_tractPrimary['i_gaap1p5Flux']*aper_corr_dict['i']
+		i_gaap2p5Flux_aperCorr = df_tractPrimary['i_gaap2p5Flux']*aper_corr_dict['i']
+		df_tractPrimary['i_gaap1p0Flux_aperCorr'] = i_gaap1p0Flux_aperCorr
+		df_tractPrimary['i_gaap1p5Flux_aperCorr'] = i_gaap1p5Flux_aperCorr
+		df_tractPrimary['i_gaap2p5Flux_aperCorr'] = i_gaap2p5Flux_aperCorr
+
+		z_gaap1p0Flux_aperCorr = df_tractPrimary['z_gaap1p0Flux']*aper_corr_dict['z']
+		z_gaap1p5Flux_aperCorr = df_tractPrimary['z_gaap1p5Flux']*aper_corr_dict['z']
+		z_gaap2p5Flux_aperCorr = df_tractPrimary['z_gaap2p5Flux']*aper_corr_dict['z']
+		df_tractPrimary['z_gaap1p0Flux_aperCorr'] = z_gaap1p0Flux_aperCorr
+		df_tractPrimary['z_gaap1p5Flux_aperCorr'] = z_gaap1p5Flux_aperCorr
+		df_tractPrimary['z_gaap2p5Flux_aperCorr'] = z_gaap2p5Flux_aperCorr
+
+		y_gaap1p0Flux_aperCorr = df_tractPrimary['y_gaap1p0Flux']*aper_corr_dict['y']
+		y_gaap1p5Flux_aperCorr = df_tractPrimary['y_gaap1p5Flux']*aper_corr_dict['y']
+		y_gaap2p5Flux_aperCorr = df_tractPrimary['y_gaap2p5Flux']*aper_corr_dict['y']
+		df_tractPrimary['y_gaap1p0Flux_aperCorr'] = y_gaap1p0Flux_aperCorr
+		df_tractPrimary['y_gaap1p5Flux_aperCorr'] = y_gaap1p5Flux_aperCorr
+		df_tractPrimary['y_gaap2p5Flux_aperCorr'] = y_gaap2p5Flux_aperCorr
+		
+		print(df_tractPrimary.columns)
+
 
 		N708_exist = 0
 		N540_exist = 0
@@ -292,8 +333,8 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 		print(
 		f'# SQL QUERY S20A FROM HSC DATABASE (s20a_wide.summary) FOR TRACT = {tract}')
 
-		result_test = s20a.sql_query(sql_test, from_file=False, preview=False, verbose=True)	
-	
+		result_test = s20a.sql_query(sql_test, from_file=False, preview=False, verbose=True)
+		
 		# Use this chunck of code only if we want to apply the mask also to the HSC S20A catalog
 		# Read HSC S20A catalog for this tract
 		objects = []
@@ -472,8 +513,8 @@ def make_use_catalog(tracts):
 if __name__ == '__main__':
     start_time = time.time()
 
-    fire.Fire(merge_merian_catalogs)
-    #fire.Fire(select_unique_objs)
+    #fire.Fire(merge_merian_catalogs)
+    fire.Fire(select_unique_objs)
     #fire.Fire(apply_bright_star_mask)
     #fire.Fire(download_s20a)
     #fire.Fire(merge_merian_hscS20A)
