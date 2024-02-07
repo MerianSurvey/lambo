@@ -29,7 +29,9 @@ repo = '/scratch/gpfs/am2907/Merian/gaap/'
 repo_out = '/scratch/gpfs/sd8758/merian/catalog/'
 s20a = hsc.Hsc(dr='dr3', rerun='s20a_wide')
 cat_param_file = '/scratch/gpfs/sd8758/merian/lambo/scripts/hsc_gaap/cat.param'
-aper_corr_dict = {'g':1.0495, 'r':1.0479, 'i':1.0437, 'z':1.0377, 'y':1.0542}
+aper_corr_1p0_dict = {'g':1.0466, 'r':1.0457, 'i':1.0408, 'z':1.0420, 'y':1.0524}
+aper_corr_1p5_dict = {'g':1.0151, 'r':1.0157, 'i':1.0148, 'z':1.0157, 'y':1.0170}
+aper_corr_2p5_dict = {'g':0.9836, 'r':0.9857, 'i':0.9908, 'z':0.9901, 'y':0.9813}
 
 def load_param_file(filename=cat_param_file):
 	dat = pd.read_csv(filename, delimiter='\t', header=0)
@@ -136,38 +138,38 @@ def select_unique_objs(tracts, repo=repo, alltracts=False):
 		df_tractPrimary = tablePrimary.to_pandas()
 		
 		# add columns with aperture correction applied to grizy
-		g_gaap1p0Flux_aperCorr = df_tractPrimary['g_gaap1p0Flux']*aper_corr_dict['g']
-		g_gaap1p5Flux_aperCorr = df_tractPrimary['g_gaap1p5Flux']*aper_corr_dict['g']
-		g_gaap2p5Flux_aperCorr = df_tractPrimary['g_gaap2p5Flux']*aper_corr_dict['g']
+		g_gaap1p0Flux_aperCorr = df_tractPrimary['g_gaap1p0Flux']*aper_corr_1p0_dict['g']
+		g_gaap1p5Flux_aperCorr = df_tractPrimary['g_gaap1p5Flux']*aper_corr_1p5_dict['g']
+		g_gaap2p5Flux_aperCorr = df_tractPrimary['g_gaap2p5Flux']*aper_corr_2p5_dict['g']
 		df_tractPrimary['g_gaap1p0Flux_aperCorr'] = g_gaap1p0Flux_aperCorr
 		df_tractPrimary['g_gaap1p5Flux_aperCorr'] = g_gaap1p5Flux_aperCorr
 		df_tractPrimary['g_gaap2p5Flux_aperCorr'] = g_gaap2p5Flux_aperCorr
 
 
-		r_gaap1p0Flux_aperCorr = df_tractPrimary['r_gaap1p0Flux']*aper_corr_dict['r']
-		r_gaap1p5Flux_aperCorr = df_tractPrimary['r_gaap1p5Flux']*aper_corr_dict['r']
-		r_gaap2p5Flux_aperCorr = df_tractPrimary['r_gaap2p5Flux']*aper_corr_dict['r']
+		r_gaap1p0Flux_aperCorr = df_tractPrimary['r_gaap1p0Flux']*aper_corr_1p0_dict['r']
+		r_gaap1p5Flux_aperCorr = df_tractPrimary['r_gaap1p5Flux']*aper_corr_1p5_dict['r']
+		r_gaap2p5Flux_aperCorr = df_tractPrimary['r_gaap2p5Flux']*aper_corr_2p5_dict['r']
 		df_tractPrimary['r_gaap1p0Flux_aperCorr'] = r_gaap1p0Flux_aperCorr
 		df_tractPrimary['r_gaap1p5Flux_aperCorr'] = r_gaap1p5Flux_aperCorr
 		df_tractPrimary['r_gaap2p5Flux_aperCorr'] = r_gaap2p5Flux_aperCorr
 
-		i_gaap1p0Flux_aperCorr = df_tractPrimary['i_gaap1p0Flux']*aper_corr_dict['i']
-		i_gaap1p5Flux_aperCorr = df_tractPrimary['i_gaap1p5Flux']*aper_corr_dict['i']
-		i_gaap2p5Flux_aperCorr = df_tractPrimary['i_gaap2p5Flux']*aper_corr_dict['i']
+		i_gaap1p0Flux_aperCorr = df_tractPrimary['i_gaap1p0Flux']*aper_corr_1p0_dict['i']
+		i_gaap1p5Flux_aperCorr = df_tractPrimary['i_gaap1p5Flux']*aper_corr_1p5_dict['i']
+		i_gaap2p5Flux_aperCorr = df_tractPrimary['i_gaap2p5Flux']*aper_corr_2p5_dict['i']
 		df_tractPrimary['i_gaap1p0Flux_aperCorr'] = i_gaap1p0Flux_aperCorr
 		df_tractPrimary['i_gaap1p5Flux_aperCorr'] = i_gaap1p5Flux_aperCorr
 		df_tractPrimary['i_gaap2p5Flux_aperCorr'] = i_gaap2p5Flux_aperCorr
 
-		z_gaap1p0Flux_aperCorr = df_tractPrimary['z_gaap1p0Flux']*aper_corr_dict['z']
-		z_gaap1p5Flux_aperCorr = df_tractPrimary['z_gaap1p5Flux']*aper_corr_dict['z']
-		z_gaap2p5Flux_aperCorr = df_tractPrimary['z_gaap2p5Flux']*aper_corr_dict['z']
+		z_gaap1p0Flux_aperCorr = df_tractPrimary['z_gaap1p0Flux']*aper_corr_1p0_dict['z']
+		z_gaap1p5Flux_aperCorr = df_tractPrimary['z_gaap1p5Flux']*aper_corr_1p5_dict['z']
+		z_gaap2p5Flux_aperCorr = df_tractPrimary['z_gaap2p5Flux']*aper_corr_2p5_dict['z']
 		df_tractPrimary['z_gaap1p0Flux_aperCorr'] = z_gaap1p0Flux_aperCorr
 		df_tractPrimary['z_gaap1p5Flux_aperCorr'] = z_gaap1p5Flux_aperCorr
 		df_tractPrimary['z_gaap2p5Flux_aperCorr'] = z_gaap2p5Flux_aperCorr
 
-		y_gaap1p0Flux_aperCorr = df_tractPrimary['y_gaap1p0Flux']*aper_corr_dict['y']
-		y_gaap1p5Flux_aperCorr = df_tractPrimary['y_gaap1p5Flux']*aper_corr_dict['y']
-		y_gaap2p5Flux_aperCorr = df_tractPrimary['y_gaap2p5Flux']*aper_corr_dict['y']
+		y_gaap1p0Flux_aperCorr = df_tractPrimary['y_gaap1p0Flux']*aper_corr_1p0_dict['y']
+		y_gaap1p5Flux_aperCorr = df_tractPrimary['y_gaap1p5Flux']*aper_corr_1p5_dict['y']
+		y_gaap2p5Flux_aperCorr = df_tractPrimary['y_gaap2p5Flux']*aper_corr_2p5_dict['y']
 		df_tractPrimary['y_gaap1p0Flux_aperCorr'] = y_gaap1p0Flux_aperCorr
 		df_tractPrimary['y_gaap1p5Flux_aperCorr'] = y_gaap1p5Flux_aperCorr
 		df_tractPrimary['y_gaap2p5Flux_aperCorr'] = y_gaap2p5Flux_aperCorr
