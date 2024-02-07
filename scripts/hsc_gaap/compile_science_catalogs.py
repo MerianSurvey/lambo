@@ -172,7 +172,6 @@ def select_unique_objs(tracts, repo=repo, alltracts=False):
 		df_tractPrimary['y_gaap1p5Flux_aperCorr'] = y_gaap1p5Flux_aperCorr
 		df_tractPrimary['y_gaap2p5Flux_aperCorr'] = y_gaap2p5Flux_aperCorr
 		
-		print(df_tractPrimary.columns)
 
 
 		N708_exist = 0
@@ -202,7 +201,8 @@ def select_unique_objs(tracts, repo=repo, alltracts=False):
 		#df_snr_cut = df_tractPrimary[(df_tractPrimary['SNR_N708'] > 5) | (df_tractPrimary['SNR_N540'] > 5)]
 		tablePrimaryCut = Table.from_pandas(df_snr_cut)		
 
-		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
+		#outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
+		outCatDir = os.path.join(repo_out, f"DR1/{tract}/")
 		isExist = os.path.exists(outCatDir)
 		if not isExist:
 			os.makedirs(outCatDir)
@@ -257,6 +257,57 @@ def check_object_in_circles(objects, circles):
     return objects_within_circles
 
 
+def check_object_in_mask(objects, shapes):
+	objects_within_shapes = []
+	p = index.Property()
+	p.dimension = 2
+	idx = index.Index(properties=p)
+
+	# Build R-tree index for shapes (circles and boxes)
+	for i, shape in enumerate(shapes):
+		if len(shape) == 3:  # Circle
+			ra, dec, radius = shape
+			left = ra - radius
+			bottom = dec - radius
+			right = ra + radius
+			top = dec + radius
+		elif len(shape) == 4:  # Box
+			center_ra, center_dec, width, height = shape
+			left = center_ra - width / 2
+			bottom = center_dec - height / 2
+			right = center_ra + width / 2
+			top = center_dec + height / 2
+		else:
+			raise ValueError("Invalid shape format")
+
+	# Check objects within shapes
+	for j, obj in enumerate(objects):
+		obj_ra, obj_dec = obj['ra'], obj['dec']
+		result = list(idx.intersection((obj_ra, obj_dec, obj_ra, obj_dec)))
+		
+		for i in result:
+			shape = shapes[i]
+			if len(shape) == 3:  # Circle
+				shape_ra, shape_dec, shape_radius = shape
+				distance = ((obj_ra - shape_ra) ** 2 + (obj_dec - shape_dec) ** 2) ** 0.5
+				if distance <= shape_radius:
+					objects_within_shapes.append({'obj': obj, 'index': j})
+					break
+				elif len(shape) == 4:  # Box
+					shape_center_ra, shape_center_dec, shape_width, shape_height = shape
+					left = shape_center_ra - shape_width / 2
+					bottom = shape_center_dec - shape_height / 2
+					right = shape_center_ra + shape_width / 2
+					top = shape_center_dec + shape_height / 2
+				
+					if left <= obj_ra <= right and bottom <= obj_dec <= top:
+						print('yes!! box!!')
+						objects_within_shapes.append({'obj': obj, 'index': j})
+						break
+	return objects_within_shapes
+		
+
+
 def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 	print("\n ----------------------- Runs apply_bright_star_mask -----------------------\n")
 	
@@ -282,25 +333,54 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 		objects_ra = list(map(lambda x: x['ra'], objects))
 		objects_dec = list(map(lambda x: x['dec'], objects))
 		tract_center = (np.median(objects_ra), np.median(objects_dec))
-		
-		# Read the circles from the file, choose only circles at the vicinity of the tract
-		circles = []
+		tract_cen_ra = tract_center[0]
+		tract_cen_dec = tract_center[1]
+
+		# collect circles
+		ra_cir = []
+		dec_cir = []
+		radius_cir = []
 		with open(maskFile, 'r') as file:
-    			for line in file:
-        			if line.startswith('circle'):
-            				circle = parse_circle(line, tract_center)
-            				if circle:
-                				circles.append(circle)
-	
+			for line in file:
+				if line.startswith('circle'):
+					match = re.search(r'circle\(([-+]?[0-9]*\.?[0-9]+), ([-+]?[0-9]*\.?[0-9]+), ([-+]?[0-9]*\.?[0-9]+)d\)', line)
+					ra_cir.append(float(match.group(1)))
+					dec_cir.append(float(match.group(2)))
+					radius_cir.append(float(match.group(3)))
+		df_mask = pd.DataFrame({'ra': ra_cir, 'dec': dec_cir, 'radius': radius_cir})
+		df_mask['ra_dec_combined'] = df_mask['ra'].astype(str) + '_' + df_mask['dec'].astype(str)
+		df_mask.sort_values(by='radius', inplace=True)
+		df_no_duplicates = df_mask.drop_duplicates(subset='ra_dec_combined', keep='first')
+		distances = (((df_no_duplicates['ra'].to_numpy() - tract_cen_ra) ** 2 + (df_no_duplicates['dec'].to_numpy() - tract_cen_dec) ** 2) ** 0.5)
+		dfd = df_no_duplicates.copy()
+		dfd.loc[:, 'distance'] = distances
+		df_no_duplicates_in = dfd[dfd['distance']<3]
+		circles = list(zip(df_no_duplicates_in['ra'], df_no_duplicates_in['dec'], df_no_duplicates_in['radius']))
+		
 
-		# keep only small circles (less conserevative mask)
-		circles_large = circles
-		circles = circles_large[::2]
+		# collect boxes
+		ra_box = []
+		dec_box = []
+		width_box = []
+		height_box = []
+		with open(maskFile, 'r') as file:
+			for line in file:
+				if line.startswith('box'):
+					match = re.search(r'box\(([-+]?[0-9]*\.?[0-9]+), ([-+]?[0-9]*\.?[0-9]+), ([-+]?[0-9]*\.?[0-9]+)d, ([-+]?[0-9]*\.?[0-9]+)d, ([-+]?[0-9]*\.?[0-9]+)\)', line)
+					ra_box.append(float(match.group(1)))
+					dec_box.append(float(match.group(2)))
+					width_box.append(float(match.group(3)))
+					height_box.append(float(match.group(4)))
 
+		df_mask_boxes = pd.DataFrame({'ra': ra_box, 'dec': dec_box, 'width_box': width_box, 'height_box':height_box})
+		boxes = list(zip(df_mask_boxes['ra'], df_mask_boxes['dec'], df_mask_boxes['width_box'], df_mask_boxes['height_box']))
+
+		shapes = circles + boxes
+			
 
 		# Check objects within circles
 		start_time = time.time()
-		objects_within_circles = check_object_in_circles(objects, circles)
+		objects_within_circles = check_object_in_mask(objects, shapes)
 		elapsed_time = time.time() - start_time
 		print(f"Elapsed time: {elapsed_time} seconds")
 		print("\n")
@@ -312,7 +392,7 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 		tractTable['IsMask'] = IsMask
 
 		# Write to a new fits file
-		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
+		outCatDir = os.path.join(repo_out, f"DR1/{tract}/")
 		outCatFile = os.path.join(outCatDir, f'meriandr1_mask_{tract}_S20A.fits')
 		tractTable.write(outCatFile, overwrite=True)
 		
@@ -327,7 +407,7 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 	for tract in tracts:
 		print("Working on tract: " + str(tract))
 		sql_test = open(os.path.join(os.getenv("LAMBO_HOME"), 'lambo/scripts/hsc_gaap/HSC_S20A_tract.SQL'), 'r').read()
-		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")		
+		outCatDir = os.path.join(repo_out, f"DR1/{tract}/")		
 
 		sql_test = sql_test.replace('8524', str(tract))	
 		print(
@@ -335,6 +415,10 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 
 		result_test = s20a.sql_query(sql_test, from_file=False, preview=False, verbose=True)
 		
+
+		outCatFileTmp = os.path.join(outCatDir, f'hsc_nomask_{tract}_S20A.fits')
+		result_test.write(outCatFileTmp, overwrite=True)
+
 		# Use this chunck of code only if we want to apply the mask also to the HSC S20A catalog
 		# Read HSC S20A catalog for this tract
 		objects = []
@@ -345,23 +429,53 @@ def download_s20a(tracts, save=False, outdir='/projects/MERIAN/repo/'):
 		objects_dec = list(map(lambda x: x['dec'], objects))
 		tract_center = (np.median(objects_ra), np.median(objects_dec))
 		print('tract center: ' + str(tract_center))
+		tract_cen_ra = tract_center[0]
+		tract_cen_dec = tract_center[1]
 
-		# Read the circles from the file, choose only circles at the vicinity of the tract
-		circles = []
+		# trying a different code of getting mask circles
+		ra_cir = []
+		dec_cir = []
+		radius_cir = []
 		with open(maskFile, 'r') as file:
 			for line in file:
 				if line.startswith('circle'):
-					circle = parse_circle(line, tract_center)
-					if circle:
-						circles.append(circle)
+					match = re.search(r'circle\(([-+]?[0-9]*\.?[0-9]+), ([-+]?[0-9]*\.?[0-9]+), ([-+]?[0-9]*\.?[0-9]+)d\)', line)
+					ra_cir.append(float(match.group(1)))
+					dec_cir.append(float(match.group(2)))
+					radius_cir.append(float(match.group(3)))
+		df_mask = pd.DataFrame({'ra': ra_cir, 'dec': dec_cir, 'radius': radius_cir})
+		df_mask['ra_dec_combined'] = df_mask['ra'].astype(str) + '_' + df_mask['dec'].astype(str)
+		df_mask.sort_values(by='radius', inplace=True)
+		df_no_duplicates = df_mask.drop_duplicates(subset='ra_dec_combined', keep='first')
+		distances = (((df_no_duplicates['ra'].to_numpy() - tract_cen_ra) ** 2 + (df_no_duplicates['dec'].to_numpy() - tract_cen_dec) ** 2) ** 0.5)
+		dfd = df_no_duplicates.copy()
+		dfd.loc[:, 'distance'] = distances
+		df_no_duplicates_in = dfd[dfd['distance']<3]
+		circles = list(zip(df_no_duplicates_in['ra'], df_no_duplicates_in['dec'], df_no_duplicates_in['radius']))
 
-		# keep only small circles (less conserevative mask)
-		circles_large = circles
-		circles = circles_large[::2]
+		# collect boxes
+		ra_box = []
+		dec_box = []
+		width_box = []
+		height_box = []
+		with open(maskFile, 'r') as file:
+			for line in file:
+				if line.startswith('box'):
+					match = re.search(r'box\(([-+]?[0-9]*\.?[0-9]+), ([-+]?[0-9]*\.?[0-9]+), ([-+]?[0-9]*\.?[0-9]+)d, ([-+]?[0-9]*\.?[0-9]+)d, ([-+]?[0-9]*\.?[0-9]+)\)', line)
+					ra_box.append(float(match.group(1)))
+					dec_box.append(float(match.group(2)))
+					width_box.append(float(match.group(3)))
+					height_box.append(float(match.group(4)))
+
+		df_mask_boxes = pd.DataFrame({'ra': ra_box, 'dec': dec_box, 'width_box': width_box, 'height_box':height_box})
+		boxes = list(zip(df_mask_boxes['ra'], df_mask_boxes['dec'], df_mask_boxes['width_box'], df_mask_boxes['height_box']))
+
+		shapes = circles + boxes
+
 
 		# Check objects within circles
 		start_time = time.time()
-		objects_within_circles = check_object_in_circles(objects, circles)
+		objects_within_circles = check_object_in_mask(objects, shapes)
 		elapsed_time = time.time() - start_time
 		print(f"Elapsed time: {elapsed_time} seconds")
 
@@ -393,7 +507,7 @@ def merge_merian_hscS20A(tracts):
  
 	for tract in tracts:
 		print("Working on tract: " + str(tract))
-		catDir = os.path.join(repo_out, f"S20A/{tract}/")
+		catDir = os.path.join(repo_out, f"DR1/{tract}/")
 		hscGaap_file = f'hsc_gaap_{tract}_S20A.fits'
 		merianGaap_file = f'meriandr1_mask_{tract}_S20A.fits'
 	
@@ -448,7 +562,7 @@ def merge_merian_hscS20A(tracts):
 		#print(type(combined_table['z_apertureflux_10_flux_HSCS20A'][0]))
 	
 		# Write to a new fits file
-		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
+		outCatDir = os.path.join(repo_out, f"DR1/{tract}/")
 		outCatFile = os.path.join(outCatDir, f'meriandr1_hscmerged_{tract}_S20A.fits')
 		combined_table.write(outCatFile, overwrite=True)
 		print(f"MERGED HSC S20A + MERIAN TABLE OF SCIENCE OBJECTS WITH {len(combined_table)} ROWS and {len(combined_table.colnames)} COLUMNS")
@@ -464,7 +578,7 @@ def make_use_catalog(tracts):
 
 	for tract in tracts:
 		print("Working on tract: " + str(tract))
-		catDir = os.path.join(repo_out, f"S20A/{tract}/")
+		catDir = os.path.join(repo_out, f"DR1/{tract}/")
 		mergedCat_file = f'meriandr1_hscmerged_{tract}_S20A.fits'
 
 		if not os.path.isfile(os.path.join(catDir, mergedCat_file)):
@@ -502,7 +616,7 @@ def make_use_catalog(tracts):
 
 
 		# Write to a new fits file
-		outCatDir = os.path.join(repo_out, f"S20A/{tract}/")
+		outCatDir = os.path.join(repo_out, f"DR1/{tract}/")
 		outCatFile = os.path.join(outCatDir, f'meriandr1_use_{tract}_S20A.fits')
 
 		ofd.writeto(outCatFile, overwrite=True)
@@ -513,11 +627,11 @@ def make_use_catalog(tracts):
 if __name__ == '__main__':
     start_time = time.time()
 
-    #fire.Fire(merge_merian_catalogs)
+    fire.Fire(merge_merian_catalogs)
     fire.Fire(select_unique_objs)
-    #fire.Fire(apply_bright_star_mask)
-    #fire.Fire(download_s20a)
-    #fire.Fire(merge_merian_hscS20A)
-    #fire.Fire(make_use_catalog)
+    fire.Fire(apply_bright_star_mask)
+    fire.Fire(download_s20a)
+    fire.Fire(merge_merian_hscS20A)
+    fire.Fire(make_use_catalog)
 
     print("--- %s seconds ---" % (time.time() - start_time))
