@@ -282,6 +282,8 @@ def check_object_in_mask(objects, shapes):
 		else:
 			raise ValueError("Invalid shape format")
 
+		idx.insert(i, (left, bottom, right, top))
+
 	# Check objects within shapes
 	for j, obj in enumerate(objects):
 		obj_ra, obj_dec = obj['ra'], obj['dec']
@@ -303,9 +305,9 @@ def check_object_in_mask(objects, shapes):
 					top = shape_center_dec + shape_height / 2
 				
 					if left <= obj_ra <= right and bottom <= obj_dec <= top:
-						print('yes!! box!!')
 						objects_within_shapes.append({'obj': obj, 'index': j})
 						break
+	print('len(objects_within_shapes): ' + str(len(objects_within_shapes)))
 	return objects_within_shapes
 		
 
@@ -322,7 +324,7 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 		#maskFile = os.path.join(maskDir, f'S20A_mask_'+str(tract)+'.reg')
 		
 		print("Working on tract: " + str(tract))
-		catDir = os.path.join(repo, f"S20A/{tract}/")
+		catDir = os.path.join(repo, f"DR1/{tract}/")
 		catFile = os.path.join(catDir, f'meriandr1_unique_{tract}_S20A.fits')
 
 
@@ -378,7 +380,8 @@ def apply_bright_star_mask(tracts, repo=repo_out, alltracts=False):
 		boxes = list(zip(df_mask_boxes['ra'], df_mask_boxes['dec'], df_mask_boxes['width_box'], df_mask_boxes['height_box']))
 
 		shapes = circles + boxes
-			
+		
+	
 
 		# Check objects within circles
 		start_time = time.time()
@@ -629,8 +632,8 @@ def make_use_catalog(tracts):
 if __name__ == '__main__':
     start_time = time.time()
 
-    fire.Fire(merge_merian_catalogs)
-    fire.Fire(select_unique_objs)
+    #fire.Fire(merge_merian_catalogs)
+    #fire.Fire(select_unique_objs)
     fire.Fire(apply_bright_star_mask)
     fire.Fire(download_s20a)
     fire.Fire(merge_merian_hscS20A)
