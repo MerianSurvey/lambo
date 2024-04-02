@@ -16,7 +16,8 @@ import pandas as pd
 
 import fire
 
-cat_dir = '/scratch/gpfs/sd8758/merian/catalog/S20A/'
+#cat_dir = '/scratch/gpfs/sd8758/merian/catalog/S20A/'
+cat_dir = '/scratch/gpfs/sd8758/merian/catalog/DR1/'
 
 def get_summary_cat():
 	
